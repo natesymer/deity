@@ -5,65 +5,91 @@
 # arbitrary shell commands.
 
 # Configuration:
-# lid_open=echo "lid opened."
-# lid_close=echo "lid closed."
-# headphones_in=echo "headphones in."
-# headphones_out=echo "headphones out."
-# <keysym>
+# 
+# Typical GLib key-value config format. Each section represents
+# a stimulus:
+# 
+# - `lid_open`
+# - `lid_close`
+# - `headphones_in`
+# - `headphones_out`
+# - XKB keysyms composed together with `+`
+#
+# For each section, there is a single key, `Exec`. When this
+# stimulus is activated, the command specified by `Exec` will
+# be executed.
+#
+# Config is either stored in /etc/kbmapper/kbmapper.conf
+# or in separate files /etc/kbmapper/kbmapper.d/*.conf
+#
+# Typical linux config precendence follows.
 
-# Configuration: (GLib format)
-#
-#     [lidopen]
-#     # Exec=
-#
-#     [lidclose]
-#     # Exec=
-#
-#     [heaphonesin]
-#     # Exec=
-#
-#     [headphonesout
-#
-#     [<keysym>]
-#     # Exec=
-#
-# Either add to /etc/kbmapper/kbmapper
-#
-# /etc/kbmapper/mappings.d/
-#
-# TODO: configure via glib
-# https://github.com/joehakimrahme/Agros/wiki/Parsing-the-conf-file-with-GLib
-
+import configparser
+import atexit
 import asyncio
 import evdev
 from xkbcommon import xkb
+import sys
+import os
+import signal
 
 ctx = xkb.Context()
 keymap = ctx.keymap_new_from_names()
 state = keymap.state_new()
-# TODO: block event propagation if accepted as a binding
+
+def ls(direc):
+  for dpth, _, fnames in os.walk(direc):
+    for f in fnames:
+      yield os.path.abspath(os.path.join(dpth, f))
+
+def load_config(f):
+  c = configparser.ConfigParser()
+  c.read(f)
+  d = {}
+  for sec in c:
+    d[sec] = c[sec].get("Exec", None)
+  return d
+
+# TODO: kbmapper.d config isn't loaded yet.
+
+config = load_config("./kbmapper.conf")
 
 def map_keycode(keycode):
-  return xkb.keysym_to_string(state.key_get_one_sym(keycode + keymap.min_keycode() - 1))
+  raw = xkb.keysym_get_name(state.key_get_one_sym(keycode + keymap.min_keycode() - 1))
+  if raw == "NoSymbol":
+    return None
+  elif '_' in raw:
+    return raw.split('_')[0]
+  else:
+    return raw
 
 def emit_keystroke(keycodes):
   keysyms = [map_keycode(kc) for kc in keycodes]
-  print("Pressed: " + str(keysyms))
+  cmd = config.get('+'.join(keysyms), None)
+  if cmd is not None:
+    print(os.system(cmd))
+    return True
   return False
 
 def emit_lid(closed=False):
-  print("Lid closed: " + str(closed))
-  return True
+  v = "close" if closed else "open"
+  cmd = config.get("lid_" + v, None)
+  if cmd is not None:
+    print(os.system(cmd))
+    return True
+  return False
 
 def emit_headphone(plugged_in=False):
-  print("Headphones plugged in: " + str(plugged_in))
-  return True
+  cmd = config.get("headphones_" + ("in" if plugged_in else "out"), None)
+  if cmd is not None:
+    print(os.system(cmd))
+    return True
+  return False
+
+# TODO: block event propagation if accepted as a binding
 
 keystack = []
 cur_ev = None
-
-# 163 (track next)
-# 165 (track prev)
 
 @asyncio.coroutine
 def listen_events(d):
@@ -89,6 +115,7 @@ def listen_events(d):
           emit_lid(cur_ev[1] == 0)
         if cur_ev is not None and cur_ev[0] is 2: # headphone jack event 
           emit_headphone(cur_ev[1] is 1)
+        cur_ev = None
 
 # GET DEVICES FROM EVDEV
 # We want:
@@ -101,10 +128,15 @@ for fn in evdev.list_devices():
   d = evdev.InputDevice(fn)
   c = d.capabilities()
   if 1 in c or 5 in c:
-   # print(d)
-   # print({1: c.get(1, None), 5: c.get(5, None)})
     asyncio.async(listen_events((d)))
-  # print(d.name, d.capabilities(verbose=True), sep=": ")
 
 loop = asyncio.get_event_loop()
+  
+def signal_handler(signal, frame):
+  loop.stop()
+  sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
+
 loop.run_forever()
