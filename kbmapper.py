@@ -4,6 +4,13 @@
 #Use evdev and the system locale to bind key combinations to
 # arbitrary shell commands.
 
+# Configuration:
+# lid_open=echo "lid opened."
+# lid_close=echo "lid closed."
+# headphones_in=echo "headphones in."
+# headphones_out=echo "headphones out."
+# <keysym>
+
 # Configuration: (GLib format)
 #
 #     [lidopen]
@@ -12,8 +19,10 @@
 #     [lidclose]
 #     # Exec=
 #
-#     [heaphones]
+#     [heaphonesin]
 #     # Exec=
+#
+#     [headphonesout
 #
 #     [<keysym>]
 #     # Exec=
@@ -27,13 +36,19 @@
 
 import asyncio
 import evdev
-# from xcbcommon import xkb
+from xkbcommon import xkb
 
-
+ctx = xkb.Context()
+keymap = ctx.keymap_new_from_names()
+state = keymap.state_new()
 # TODO: block event propagation if accepted as a binding
 
+def map_keycode(keycode):
+  return xkb.keysym_to_string(state.key_get_one_sym(keycode + keymap.min_keycode() - 1))
+
 def emit_keystroke(keycodes):
-  print("Pressed: " + str(keycodes))
+  keysyms = [map_keycode(kc) for kc in keycodes]
+  print("Pressed: " + str(keysyms))
   return False
 
 def emit_lid(closed=False):
@@ -44,9 +59,7 @@ def emit_headphone(plugged_in=False):
   print("Headphones plugged in: " + str(plugged_in))
   return True
 
-keymapping = {} # TODO: generate this
 keystack = []
-
 cur_ev = None
 
 # 163 (track next)
@@ -55,11 +68,11 @@ cur_ev = None
 @asyncio.coroutine
 def listen_events(d):
   global keystack
+  global cur_ev
   while True:
     events = yield from d.async_read()
     for e in events:
       if e.type is 1:         # Key action
-        # TODO: better key combination handling
         if e.value is 1: # press down
           if e.code not in keystack:
             keystack.append(e.code)
