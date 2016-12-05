@@ -37,6 +37,9 @@ from xkbcommon import xkb
 import sys
 import os
 import signal
+import subprocess
+import pwd
+import shlex
 
 #
 ## XKB Keysyms
@@ -74,6 +77,9 @@ def load_config(f):
   c.read(f)
   return c
 
+def config_true(c, k):
+  return str(c.get(k, "")).lower() == "true"
+
 paths = ls("/etc/kbmapper/kbmapper.d/")
 paths.append("/etc/kbmapper/kbmapper.conf")
 configs = list(map(load_config, paths))
@@ -82,43 +88,68 @@ configs = list(map(load_config, paths))
 ## Event Handling
 #
 
-# TODO: order-independent config matching
-def emit(keysym):
+# Takes: a list of keysyms
+# Returns: (reset_stack, pop_stack)
+def emit(keys):
+  not_none = lambda v: v is not None
+  keysym = '+'.join(list(filter(not_none, map(map_keycode, keys))))
   for cfg in configs:
     if keysym in cfg:
       v = cfg[keysym]
       cmd = v.get("Exec", None) # Command to execute on event
       if cmd is not None:
-        user = v.get("User", None) # User to execute command as
-        workdir = v.get("WorkingDirectory", None) # Directory to execute command in
-        print(os.system(cmd))
-        return True
-  return False
+        subproc(
+          cmd,
+          cwd=v.get("Directory", None),
+          user=v.get("User", None),
+          xdg=config_true(v, "NeedsXDG"),
+          dbus=config_true(v, "NeedsDBus"),
+          wayland=config_true(v, "NeedsWayland"),
+          sway=config_true(v, "NeedsSway")
+        )
+        return (not config_true(v, "AllowsRepeat"), False)
+  return (False, True)
 
 #
 ## Event Implementation
 #
 
-keystack = []
+stack = []
+
+def handle_key(keycode, pressed, isrepeat):
+  global stack
+  if pressed and not isrepeat:
+    if keycode not in stack:
+      stack.append(keycode)
+  else:
+    if keycode in stack:
+      reset_stack, pop_stack = emit(stack)
+      if reset_stack:
+        stack = []
+      elif pop_stack or not isrepeat:
+        stack.remove(keycode)
+
+# TODO: make lid and audiojack events behave more like keys
+def handle_lid(closed):
+  global stack
+  emit(stack + ["LidClosed" if closed else "LidOpen"])
+
+def handle_audiojack(plugged):
+  global stack
+  emit(stack + ["AudioPlugged" if plugged else "AudioUnplugged"])
 
 def handle_event(code, typ, value):
-  global keystack
-  print(code, typ, value)
-  if typ is 1: # Key action
-    if value is 1: # press down
-      if code not in keystack:
-        keystack.append(code)
-    elif value is 0: # lift up
-      if code in keystack:
-        if emit('+'.join(list(map(map_keycode,keystack)))):
-          keystack = []
-        else:
-          keystack.remove(code)
+  if typ is 1:
+    handle_key(code, value > 0, value == 2)
   elif typ is 5:
-    if code is 0: # lid event
-      emit("LidOpen" if value is 0 else "LidClose")
+    if code is 0:
+      handle_lid(value is 1)
     elif code is 2: # headphone jack event
-      emit("HeadphonesIn" if value is 1 else "HeadphonesOut")
+      handle_audiojack(value is 1)
+
+#
+## Evdev Listener
+#
 
 @asyncio.coroutine
 def listen_events(d):
@@ -135,6 +166,43 @@ def listen_events(d):
         cur_ev = e
 
 #
+## Subprocess
+#
+
+# TODO: don't execute command if xdg, dbus, wayland, or sway is not found.
+def subproc(cmd, cwd=None, user=None, xdg=False, dbus=False, wayland=False, sway=False):
+  env = os.environ.copy()
+  pw = pwd.getpwnam(user if user is not None else env['USER'])
+  # env.clear()
+  wd = cwd if cwd is not None else pw.pw_dir
+  print(cmd, pw.pw_name, wd, xdg)
+  env['HOME'] = pw.pw_dir
+  env['LOGNAME'] = pw.pw_name
+  env['PWD'] = wd
+  env['USER'] = pw.pw_name
+  if xdg:
+    runtime_dir = "/run/user/" + str(pw.pw_uid)
+    env['XDG_RUNTIME_DIR'] = runtime_dir
+    env['XDG_CONFIG_HOME'] = pw.pw_dir + "/.config"
+    for pth in ls(runtime_dir):
+      fname = pth.split('/')[-1]
+      if dbus and fname == "bus":
+        env['DBUS_SESSION_BUS_ADDRESS'] = 'unix:path=' + pth
+      elif wayland and "wayland" in fname and "lock" not in fname:
+        env['WAYLAND_DISPLAY'] = fname
+      elif sway and "sway-ipc" in fname:
+        v = runtime_dir + '/' + fname
+        env['SWAYSOCK'] = v
+        env['I3SOCK'] = v
+  uid = pw.pw_uid
+  gid = pw.pw_gid
+  def demote():
+    os.setgid(gid)
+    os.setuid(uid)
+  p = subprocess.Popen(cmd, preexec_fn=demote, cwd=wd, env=env, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+  print(p.communicate())
+
+#
 ## Main
 #
 
@@ -143,6 +211,7 @@ def main(args):
     d = evdev.InputDevice(fn)
     c = d.capabilities()
     if 1 in c or 5 in c: # 1 is EV_KEY and 5 is EV_SW
+      # TODO: get keyboard, lid, and headphone jack status before running
       asyncio.async(listen_events((d)))
 
   loop = asyncio.get_event_loop()
