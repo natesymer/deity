@@ -25,26 +25,27 @@ import sys
 
 def main(args):
   if args.command == "audio":
+    with Audio("desktop.py") as a:
     if args.list_outputs:
-      for sink in pulse().sink_list():
-        print("{}. {} ({}%)".format(int(sink.index), sink.name, floor(sink.volume.value_flat * 100)))
+      for o in a.outputs:
+        print(str(o))
 
     if args.toggle_mute:
-      set_muted(not is_muted())
+      a.output.muted = not a.output.muted
 
     if args.toggle_mic:
       os.system("patctl set-source-mute @DEFAULT_SOURCE@ toggle")
 
     o = args.set_output
     if o != None:
-      set_output(o)
+      a.output = o
 
     vol_adj = args.adjust_volume
     if vol_adj != None:
-      set_output_volume(output_volume() + int(vol_adj))
+      a.output.volume = a.output.volume + int(vol_adj)
 
     if args.sanitize:
-      sanitize()
+      a.sanitize()
   elif args.command == "screenshot":
     direc = args.destination.rstrip('/')
     os.system("mkdir -p " + direc)
@@ -73,50 +74,89 @@ def main(args):
 # Implements a wrapper around the sink/sink-input model of PulseAudio.
 #
 
-# Getter for PulseAudio instance
-def pulse():
-  pulse.singleton = pulse.singleton or Pulse('desktop.py')
-  return pulse.singleton
-pulse.singleton = None
+# An abstraction over PulseAudio
+class Audio(object):
+  def __init__(self, name):
+    self.pulse = Pulse(name)
 
-# Destroys pulse instance
-def destroy_pulse():
-  if pulse.singleton is not None:
-    pulse.singleton.close()
+  def __enter__(self):
+    return self
 
-# Gets the current audio "output"
-def output():
-  for s in pulse().sink_list():
-    if s.name == pulse().server_info().default_sink_name:
-      return s
+  def __exit__(self, exc_type, exc_value, traceback):
+    self.close()
 
-def set_output(o):
-  pulse().sink_default_set(str(o))
+  def close(self):
+    self.pulse.close()
 
-def output_volume():
-  return int(round(output().volume.value_flat * 100))
+  @property
+  def outputs(self):
+    return list(map(lambda x: Output(x, self.pulse), self.pulse.sink_list()))
 
-def set_output_volume(v):
-  vp = v
-  if vp < 0:
-    vp = 0
-  elif vp > 100:
-    vp = 100
-  pulse().volume_set_all_chans(output(),float(vp)/100.0)
+  def print_outputs(self):
+    for output in self.outputs:
+    for sink in self.pulse.sink_list():
+      
 
-def is_muted():
-  return bool(output().mute)
+  @property
+  def output(self):
+    for s in pulse().sink_lise():
+      if s.name == self.pulse.server_info().default_sink_name:
+        return Output(s, self.pulse)
+    return None
 
-def set_muted(m):
-  pulse().sink_mute(output().index,int(bool(m)))
+  @output.setter
+  def output(self, o):
+    pulse().sink_default_set(str(o))
 
-def sanitize():
-  pulse().sink_suspend(output().index, 0)
-  for si in pulse().sink_input_list():
-    pulse().sink_input_move(si.index, output().index)
-  for s in pulse().sink_list():
-    if s.name != output().name:
-      pulse().sink_suspend(s.index, 1)
+  def sanitize(self):
+    pulse().sink_suspend(output().index, 0)
+    for si in pulse().sink_input_list():
+      pulse().sink_input_move(si.index, output().index)
+    for s in pulse().sink_list():
+      if s.name != output().name:
+        pulse().sink_suspend(s.index, 1)
+
+# An output is an abstraction over a sink.
+class Output(object):
+  def __init__(self, sink, pulse):
+    self.sink = sink
+    self.pulse = pulse
+
+  @property
+  def volume(self):
+    return int(round(self.sink.volume.value_flat * 100))
+
+  @volume.setter
+  def volume(self, v):
+    vp = v
+    if vp < 0:
+      vp = 0
+    elif vp > 100:
+      vp = 100
+    self.pulse.volume_set_all_chans(self.sink,float(vp)/100.0)
+
+  @property
+  def muted(self):
+    return bool(self.sink.mute)
+
+  @muted.setter
+  def muted(self, m):
+    self.pulse.sink_mute(self.sink.index,int(bool(m)))
+
+  def __str__(self):
+    def_name = self.pulse.server_info().default_sink_name
+    star = '*' if self.sink.name == def_name else ''
+    return ' '.join([int(self.sink.index), ".", self.sink.name, self.volume])
+
+  def __eq__(self, other):
+    if isinstance(other, self.__class__):
+      return self.sink.index is other.sink.instance
+    return NotImplemented
+
+  def __ne__(self, other):
+    if isinstance(other, self.__class__):
+      return self.sink.index is not other.sink.instance
+    return NotImplemented
 
 #
 ## Brightness
