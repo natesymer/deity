@@ -53,6 +53,7 @@ def main(args):
   elif args.command == "i3bar": 
     status(args)
   elif args.command == "brightness":
+    
     if args.auto:
       while True:
         autoadjust_brightness(args.lower_threshold, args.upper_threshold, args.backlight, args.backlight_class)
@@ -75,140 +76,32 @@ def main(args):
 #
 
 # An abstraction over PulseAudio
-class Audio(object):
-  def __init__(self, name):
-    self.pulse = Pulse(name)
-
-  def __enter__(self):
-    return self
-
-  def __exit__(self, exc_type, exc_value, traceback):
-    self.close()
-
-  def close(self):
-    self.pulse.close()
-
-  @property
-  def outputs(self):
-    return list(map(lambda x: Output(x, self.pulse), self.pulse.sink_list()))
-
-  def print_outputs(self):
-    for output in self.outputs:
-    for sink in self.pulse.sink_list():
-      
-
-  @property
-  def output(self):
-    for s in pulse().sink_lise():
-      if s.name == self.pulse.server_info().default_sink_name:
-        return Output(s, self.pulse)
-    return None
-
-  @output.setter
-  def output(self, o):
-    pulse().sink_default_set(str(o))
-
-  def sanitize(self):
-    pulse().sink_suspend(output().index, 0)
-    for si in pulse().sink_input_list():
-      pulse().sink_input_move(si.index, output().index)
-    for s in pulse().sink_list():
-      if s.name != output().name:
-        pulse().sink_suspend(s.index, 1)
-
-# An output is an abstraction over a sink.
-class Output(object):
-  def __init__(self, sink, pulse):
-    self.sink = sink
-    self.pulse = pulse
-
-  @property
-  def volume(self):
-    return int(round(self.sink.volume.value_flat * 100))
-
-  @volume.setter
-  def volume(self, v):
-    vp = v
-    if vp < 0:
-      vp = 0
-    elif vp > 100:
-      vp = 100
-    self.pulse.volume_set_all_chans(self.sink,float(vp)/100.0)
-
-  @property
-  def muted(self):
-    return bool(self.sink.mute)
-
-  @muted.setter
-  def muted(self, m):
-    self.pulse.sink_mute(self.sink.index,int(bool(m)))
-
-  def __str__(self):
-    def_name = self.pulse.server_info().default_sink_name
-    star = '*' if self.sink.name == def_name else ''
-    return ' '.join([int(self.sink.index), ".", self.sink.name, self.volume])
-
-  def __eq__(self, other):
-    if isinstance(other, self.__class__):
-      return self.sink.index is other.sink.instance
-    return NotImplemented
-
-  def __ne__(self, other):
-    if isinstance(other, self.__class__):
-      return self.sink.index is not other.sink.instance
-    return NotImplemented
 
 #
 ## Brightness
 #
 
-# DRY
-
-def read_file(path):
-  try:
-    f = open(path, 'r')
-    v = f.read()
-    f.close()
-    return v
-  except:
-    return None
-
-def read_sys(klass, iface, *props):
-  bp = '/'.join(["", "sys", "class", str(klass), str(iface), ""])
-  for prop in props:
-    v = read_file(bp + prop)
-    if v is not None:
-      return v.rstrip('\n')
-  return None
-
-def write_sys(klass, iface, prop, value):
-  pth = '/'.join(["", "sys", "class", str(klass), str(iface), str(prop)])
-  try:
-    fp = open(pth, 'w')
-    fp.write(str(value) + '\n')
-    fp.flush()
-    fp.close()
-    return True
-  except:
-    return False
+def Brightness(klass, iface):
+  d = SysDevice(klass, iface)
+  d.map("number", "brightness", pack=str, unpack=float)
+  d.map("max_number", "max_brightness", pack=str, unpack=float)
+  return d
 
 # gets a brightness percent (integer)
 def get_brightness(iface,klass):
-  current = read_sys(klass, iface, "actual_brightness", "brightness")
-  if current is None:
+  b = Brightness(iface, klass)
+  if b.number is None:
     return None
-  maximum = read_sys(klass, iface, "max_brightness")
-  if maximum is None:
+  if b.max_number is None:
     return None
-  return int(round((float(current) / float(maximum)) * 100))
+  return int(round((b.number / b.max_number) * 100))
 
 # sets the brightness to a percent (integer)
 def set_brightness(iface, percent, klass):
-  maximum = read_sys(klass, iface, "max_brightness")
-  if maximum is None:
+  b = Brightness(klass, iface)
+  if b.max_number is None:
     return False
-  new_brightness = round((percent / 100) * float(maximum))
-  return write_sys(klass, iface, "brightness", new_brightness)
+  b.number = round((percent / 100) * b.max_number)
 
 def adjust_brightness(iface, delta_perc, klass):
   brightness = get_brightness(iface, klass)
@@ -217,17 +110,19 @@ def adjust_brightness(iface, delta_perc, klass):
   else:
     return False
 
-def read_apple_als():
-  return int(read_file("/sys/devices/platform/applesmc.768/light")[1:-4])
+def logify(v, maxim):
+  return 0 if v == 0 else log(v, 10) / log(maxim, 10)
+
+als = Device("/sys/devices/platform/applesmc.768/")
+als.map("ambience", "light", unpack=lambda x: logify(int(x[1:-4])))
 
 prev_als = None
 def autoadjust_brightness(lowp, highp, iface, klass):
   global prev_als
-  als = read_apple_als()
-  if prev_als is not als:
-    prev_als = als
-    alsp = 0 if als is 0 else log(als, 10) / log(255 / 10)
-    v = lowp + (alsp * (highp - lowp))
+  v = als.ambience
+  if prev_als is not v:
+    prev_als = v
+    v = lowp + (v * (highp - lowp))
     set_brightness(iface, v, klass)
 
 #
