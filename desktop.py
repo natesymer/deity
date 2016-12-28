@@ -69,6 +69,38 @@ def main(args):
         sys.stdout.write("failed to read brightness: cannot read /sys/class/" + args.backlight_class + "/" + args.backlight + "/*brightness")
 
 #
+## DRY
+#
+
+def read_file(path):
+  with open(path, 'r') as f:
+    with f.read() as v:
+      return v
+  return None
+
+def write_file(path, data):
+  with open(path, 'w') as f:
+    try:
+      f.write(str(data))
+      f.flush()
+      return True
+    except:
+      return False
+  return False
+
+def read_sys(klass, iface, *props):
+  bp = '/'.join(["", "sys", "class", str(klass), str(iface), ""])
+  for prop in props:
+    v = read_file(bp + prop)
+    if v is not None:
+      return v.rstrip('\n')
+  return None
+
+def write_sys(klass, iface, prop, value):
+  pth = '/'.join(["", "sys", "class", str(klass), str(iface), str(prop)])
+  return write_file(pth, str(value) + '\n')
+
+#
 ## Pulse Audio
 # Implements a wrapper around the sink/sink-input model of PulseAudio.
 #
@@ -172,36 +204,6 @@ class Output(object):
 ## Brightness
 #
 
-# DRY
-
-def read_file(path):
-  try:
-    f = open(path, 'r')
-    v = f.read()
-    f.close()
-    return v
-  except:
-    return None
-
-def read_sys(klass, iface, *props):
-  bp = '/'.join(["", "sys", "class", str(klass), str(iface), ""])
-  for prop in props:
-    v = read_file(bp + prop)
-    if v is not None:
-      return v.rstrip('\n')
-  return None
-
-def write_sys(klass, iface, prop, value):
-  pth = '/'.join(["", "sys", "class", str(klass), str(iface), str(prop)])
-  try:
-    fp = open(pth, 'w')
-    fp.write(str(value) + '\n')
-    fp.flush()
-    fp.close()
-    return True
-  except:
-    return False
-
 # gets a brightness percent (integer)
 def get_brightness(iface,klass):
   current = read_sys(klass, iface, "actual_brightness", "brightness")
@@ -272,6 +274,14 @@ def status(args):
     time.sleep(args.refresh_interval)
   if audio is not None:
     audio.close()
+
+# TODO: detect all network devices via /sys/class/net.
+# then, device prefixes:
+#  en - ethernet
+#  wl - wlan
+#  ww - wwan
+#  sl - serial line IP
+# each of these will need strings in arguments
 
 def statusline(args,prepend_comma=False):
   items = [
