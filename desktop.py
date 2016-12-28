@@ -26,26 +26,26 @@ import sys
 def main(args):
   if args.command == "audio":
     with Audio("desktop.py") as a:
-    if args.list_outputs:
-      for o in a.outputs:
-        print(str(o))
+      if args.list_outputs:
+        for o in a.outputs:
+          print(str(o))
 
-    if args.toggle_mute:
-      a.output.muted = not a.output.muted
+      if args.toggle_mute:
+        a.output.muted = not a.output.muted
 
-    if args.toggle_mic:
-      os.system("patctl set-source-mute @DEFAULT_SOURCE@ toggle")
+      if args.toggle_mic:
+        os.system("patctl set-source-mute @DEFAULT_SOURCE@ toggle")
 
-    o = args.set_output
-    if o != None:
-      a.output = o
+      o = args.set_output
+      if o != None:
+        a.output = o
 
-    vol_adj = args.adjust_volume
-    if vol_adj != None:
-      a.output.volume = a.output.volume + int(vol_adj)
+      vol_adj = args.adjust_volume
+      if vol_adj != None:
+        a.output.volume = a.output.volume + int(vol_adj)
 
-    if args.sanitize:
-      a.sanitize()
+      if args.sanitize:
+        a.sanitize()
   elif args.command == "screenshot":
     direc = args.destination.rstrip('/')
     os.system("mkdir -p " + direc)
@@ -53,7 +53,6 @@ def main(args):
   elif args.command == "i3bar": 
     status(args)
   elif args.command == "brightness":
-    
     if args.auto:
       while True:
         autoadjust_brightness(args.lower_threshold, args.upper_threshold, args.backlight, args.backlight_class)
@@ -68,7 +67,6 @@ def main(args):
         sys.stdout.write(str(b) + '%\n')
       else:
         sys.stdout.write("failed to read brightness: cannot read /sys/class/" + args.backlight_class + "/" + args.backlight + "/*brightness")
-  destroy_pulse()
 
 #
 ## Pulse Audio
@@ -76,32 +74,152 @@ def main(args):
 #
 
 # An abstraction over PulseAudio
+class Audio(object):
+  pulses = {}
+
+  def __init__(self, name):
+    self.name = name
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, exc_type, exc_value, traceback):
+    self.close()
+
+  def close(self):
+    if self.pulse is not None:
+      self.pulse.close()
+      self.pulse = None
+
+  @property
+  def pulse(self):
+    p = self.__class__.pulses.get(self.name, None)
+    if p is None:
+      p = Pulse(self.name)
+      self.__class__.pulses[self.name] = p
+    return p
+
+  @pulse.setter
+  def pulse(self, p):
+    self.__class__.pulses[self.name] = p
+
+  @property
+  def outputs(self):
+    return list(map(lambda x: Output(x, self.pulse), self.pulse.sink_list()))
+
+  @property
+  def output(self):
+    for s in self.pulse.sink_list():
+      if s.name == self.pulse.server_info().default_sink_name:
+        return Output(s, self.pulse)
+    return None
+
+  @output.setter
+  def output(self, o):
+    pulse().sink_default_set(str(o))
+
+  def sanitize(self):
+    pulse().sink_suspend(output().index, 0)
+    for si in pulse().sink_input_list():
+      pulse().sink_input_move(si.index, output().index)
+    for s in pulse().sink_list():
+      if s.name != output().name:
+        pulse().sink_suspend(s.index, 1)
+
+# An output is an abstraction over a sink.
+class Output(object):
+  def __init__(self, sink, pulse):
+    self.sink = sink
+    self.pulse = pulse
+
+  @property
+  def volume(self):
+    return int(round(self.sink.volume.value_flat * 100))
+
+  @volume.setter
+  def volume(self, v):
+    vp = v
+    if vp < 0:
+      vp = 0
+    elif vp > 100:
+      vp = 100
+    self.pulse.volume_set_all_chans(self.sink,float(vp)/100.0)
+
+  @property
+  def muted(self):
+    return bool(self.sink.mute)
+
+  @muted.setter
+  def muted(self, m):
+    self.pulse.sink_mute(self.sink.index,int(bool(m)))
+
+  def __str__(self):
+    def_name = self.pulse.server_info().default_sink_name
+    star = '*' if self.sink.name == def_name else ''
+    return ' '.join([str(self.sink.index), ".", self.sink.name, str(self.volume)])
+
+  def __eq__(self, other):
+    if isinstance(other, self.__class__):
+      return self.sink.index is other.sink.instance
+    return NotImplemented
+
+  def __ne__(self, other):
+    if isinstance(other, self.__class__):
+      return self.sink.index is not other.sink.instance
+    return NotImplemented
 
 #
 ## Brightness
 #
 
-def Brightness(klass, iface):
-  d = SysDevice(klass, iface)
-  d.map("number", "brightness", pack=str, unpack=float)
-  d.map("max_number", "max_brightness", pack=str, unpack=float)
-  return d
+# DRY
+
+def read_file(path):
+  try:
+    f = open(path, 'r')
+    v = f.read()
+    f.close()
+    return v
+  except:
+    return None
+
+def read_sys(klass, iface, *props):
+  bp = '/'.join(["", "sys", "class", str(klass), str(iface), ""])
+  for prop in props:
+    v = read_file(bp + prop)
+    if v is not None:
+      return v.rstrip('\n')
+  return None
+
+def write_sys(klass, iface, prop, value):
+  pth = '/'.join(["", "sys", "class", str(klass), str(iface), str(prop)])
+  try:
+    fp = open(pth, 'w')
+    fp.write(str(value) + '\n')
+    fp.flush()
+    fp.close()
+    return True
+  except:
+    return False
 
 # gets a brightness percent (integer)
 def get_brightness(iface,klass):
-  b = Brightness(iface, klass)
-  if b.number is None:
+  current = read_sys(klass, iface, "actual_brightness", "brightness")
+  if current is None:
     return None
-  if b.max_number is None:
+  maximum = read_sys(klass, iface, "max_brightness")
+  if maximum is None:
     return None
-  return int(round((b.number / b.max_number) * 100))
+  return int(round((float(current) / float(maximum)) * 100))
 
 # sets the brightness to a percent (integer)
 def set_brightness(iface, percent, klass):
-  b = Brightness(klass, iface)
-  if b.max_number is None:
+  maximum = read_sys(klass, iface, "max_brightness")
+  if maximum is None:
     return False
-  b.number = round((percent / 100) * b.max_number)
+  percent_p = min(max(percent, 0), 100)
+  new_brightness = round((percent_p / 100) * float(maximum))
+  return write_sys(klass, iface, "brightness", new_brightness)
 
 def adjust_brightness(iface, delta_perc, klass):
   brightness = get_brightness(iface, klass)
@@ -110,19 +228,17 @@ def adjust_brightness(iface, delta_perc, klass):
   else:
     return False
 
-def logify(v, maxim):
-  return 0 if v == 0 else log(v, 10) / log(maxim, 10)
-
-als = Device("/sys/devices/platform/applesmc.768/")
-als.map("ambience", "light", unpack=lambda x: logify(int(x[1:-4])))
+def read_apple_als():
+  return int(read_file("/sys/devices/platform/applesmc.768/light")[1:-4])
 
 prev_als = None
 def autoadjust_brightness(lowp, highp, iface, klass):
   global prev_als
-  v = als.ambience
-  if prev_als is not v:
-    prev_als = v
-    v = lowp + (v * (highp - lowp))
+  als = read_apple_als()
+  if prev_als is not als:
+    prev_als = als
+    alsp = 0 if als is 0 else log(als, 10) / log(255 / 10)
+    v = lowp + (alsp * (highp - lowp))
     set_brightness(iface, v, klass)
 
 #
@@ -142,7 +258,10 @@ normal_color = "#FFFFFF"
 replenishing_color = "#BDC1DB"
 degraded_color = "#B87A84"
 
+audio = None
+
 def status(args):
+  global audio
   sys.stdout.write("{\"version\":1}\n[\n")
   statusline(args)
   sys.stdout.flush()
@@ -151,6 +270,8 @@ def status(args):
     statusline(args,True) 
     sys.stdout.flush()
     time.sleep(args.refresh_interval)
+  if audio is not None:
+    audio.close()
 
 def statusline(args,prepend_comma=False):
   items = [
@@ -193,11 +314,15 @@ def battery(device):
 
     return statusd("battery", device, bat_color, " " + str(bat_perc) + "%")
 
-def volume(color,mutecolor):
+def volume(color, mutecolor):
+  global audio
+  if audio is None:
+    audio = Audio("desktop.py i3bar")
+
   return statusd("volume",
                  "pulseaudio",
-                 mutecolor if is_muted() else color,
-                 " " + str(output_volume()) + "%")
+                 mutecolor if audio.output.muted else color,
+                 " " + str(audio.output.volume) + "%")
 
 def brightness(backlight):
   b = get_brightness(backlight, "backlight")
@@ -257,4 +382,3 @@ i3bar_parser.add_argument("--wifi-iface", metavar="INTERFACE", help="Wi-Fi inter
 i3bar_parser.add_argument("--backlight", metavar="NAME", help="The name of your backlight in /sys/class/backlight", default="intel_backlight")
 i3bar_parser.add_argument("--enable-clicks", help="Enable clicks from i3bar", action="store_true")
 main(main_parser.parse_args())
-destroy_pulse()
