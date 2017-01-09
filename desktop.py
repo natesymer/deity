@@ -69,38 +69,6 @@ def main(args):
         sys.stdout.write("failed to read brightness: cannot read /sys/class/" + args.backlight_class + "/" + args.backlight + "/*brightness")
 
 #
-## DRY
-#
-
-def read_file(path):
-  with open(path, 'r') as f:
-    with f.read() as v:
-      return v
-  return None
-
-def write_file(path, data):
-  with open(path, 'w') as f:
-    try:
-      f.write(str(data))
-      f.flush()
-      return True
-    except:
-      return False
-  return False
-
-def read_sys(klass, iface, *props):
-  bp = '/'.join(["", "sys", "class", str(klass), str(iface), ""])
-  for prop in props:
-    v = read_file(bp + prop)
-    if v is not None:
-      return v.rstrip('\n')
-  return None
-
-def write_sys(klass, iface, prop, value):
-  pth = '/'.join(["", "sys", "class", str(klass), str(iface), str(prop)])
-  return write_file(pth, str(value) + '\n')
-
-#
 ## Pulse Audio
 # Implements a wrapper around the sink/sink-input model of PulseAudio.
 #
@@ -137,12 +105,16 @@ class Audio(object):
 
   @property
   def outputs(self):
-    return list(map(lambda x: Output(x, self.pulse), self.pulse.sink_list()))
+    a = []
+    for x in self.pulse.sink_list():
+      a.append(Output(x, self.pulse))
+    return a
 
   @property
   def output(self):
+    default_name = self.pulse.server_info().default_sink_name
     for s in self.pulse.sink_list():
-      if s.name == self.pulse.server_info().default_sink_name:
+      if s.name == default_name:
         return Output(s, self.pulse)
     return None
 
@@ -204,6 +176,36 @@ class Output(object):
 ## Brightness
 #
 
+# DRY
+
+def read_file(path):
+  try:
+    f = open(path, 'r')
+    v = f.read()
+    f.close()
+    return v
+  except:
+    return None
+
+def read_sys(klass, iface, *props):
+  bp = '/'.join(["", "sys", "class", str(klass), str(iface), ""])
+  for prop in props:
+    v = read_file(bp + prop)
+    if v is not None:
+      return v.rstrip('\n')
+  return None
+
+def write_sys(klass, iface, prop, value):
+  pth = '/'.join(["", "sys", "class", str(klass), str(iface), str(prop)])
+  try:
+    fp = open(pth, 'w')
+    fp.write(str(value) + '\n')
+    fp.flush()
+    fp.close()
+    return True
+  except:
+    return False
+
 # gets a brightness percent (integer)
 def get_brightness(iface,klass):
   current = read_sys(klass, iface, "actual_brightness", "brightness")
@@ -230,19 +232,6 @@ def adjust_brightness(iface, delta_perc, klass):
   else:
     return False
 
-def read_apple_als():
-  return int(read_file("/sys/devices/platform/applesmc.768/light")[1:-4])
-
-prev_als = None
-def autoadjust_brightness(lowp, highp, iface, klass):
-  global prev_als
-  als = read_apple_als()
-  if prev_als is not als:
-    prev_als = als
-    alsp = 0 if als is 0 else log(als, 10) / log(255 / 10)
-    v = lowp + (alsp * (highp - lowp))
-    set_brightness(iface, v, klass)
-
 #
 ## Wifi
 #
@@ -254,60 +243,42 @@ def is_conn_to(iface):
 ## Status Bar
 #
 
-# TODO: mouse clicks
-
-normal_color = "#FFFFFF"
-replenishing_color = "#BDC1DB"
-degraded_color = "#B87A84"
-
 audio = None
 
 def status(args):
   global audio
   sys.stdout.write("{\"version\":1}\n[\n")
-  statusline(args)
-  sys.stdout.flush()
+  statusline(args, False)
   time.sleep(args.refresh_interval) 
   while True:
-    statusline(args,True) 
-    sys.stdout.flush()
+    statusline(args, True) 
     time.sleep(args.refresh_interval)
   if audio is not None:
     audio.close()
 
-# TODO: detect all network devices via /sys/class/net.
-# then, device prefixes:
-#  en - ethernet
-#  wl - wlan
-#  ww - wwan
-#  sl - serial line IP
-# each of these will need strings in arguments
-
-def statusline(args,prepend_comma=False):
+def statusline(args, prepend_comma):
   items = [
-    brightness(args.backlight),
-    volume(args.color_full, args.color_half_empty),
-    battery(args.power_supply),
-    network("wifi", args.wifi_iface, "", args.color_full, args.color_empty),
-    # TODO: ethernet
-    # TODO: unified network section
-    network("vpn", "tun0", "VPN", args.color_full, args.color_empty), # NetworkManager default
-    date(args.color_full, args.date_format)
+    brightness(args.backlight, args.color, args.color_dire),
+    volume(args.color, args.color_degrading),
+    battery(args.power_supply, args.color, args.color_improving, args.color_dire),
+    network(args.wifi_iface, "", args.color, args.color_dire),
+    network(args.vpn_iface, "VPN", args.color, args.color_dire),
+    date(args.color, args.date_format)
   ]
   prefix = ',' if prepend_comma else ''
   sys.stdout.write(prefix + '[' + ','.join(items) + ']\n')
+  sys.stdout.flush()
 
 def date(color, fmt):
-  return statusd("time", "local", color, time.strftime(fmt))
+  return statusd(color, time.strftime(fmt))
 
-# TODO: have this only read the file once
-def network(klass, iface, text, color_on, color_off):
-  return statusd(klass, iface, color_on if is_conn_to(iface) else color_off, text)
+def network(iface, text, color_on, color_off):
+  return statusd(color_on if is_conn_to(iface) else color_off, text)
 
-def battery(device):
+def battery(device, normal, charging, dire):
   uevent = read_sys("power_supply", device, "uevent")
   if uevent is None:
-    return statusd("battery", device, degraded_color, "")
+    return statusd(dire, "")
   else:
     info = dict([l.split('=') for l in uevent.split('\n')])
     ischarging = info["POWER_SUPPLY_STATUS"] == "Charging"
@@ -316,46 +287,35 @@ def battery(device):
     bat_perc = int(floor((energy_now / energy_full) * 100))
     
     if ischarging:
-      bat_color = replenishing_color
+      bat_color = charging
     elif bat_perc <= 20:
-      bat_color = degraded_color
+      bat_color = dire
     else:
-      bat_color = normal_color
+      bat_color = normal
 
-    return statusd("battery", device, bat_color, " " + str(bat_perc) + "%")
+    return statusd(bat_color, " " + str(bat_perc) + "%")
 
 def volume(color, mutecolor):
   global audio
   if audio is None:
     audio = Audio("desktop.py i3bar")
 
-  return statusd("volume",
-                 "pulseaudio",
-                 mutecolor if audio.output.muted else color,
+  return statusd(mutecolor if audio.output.muted else color,
                  " " + str(audio.output.volume) + "%")
 
-def brightness(backlight):
+def brightness(backlight, normal, degraded):
   b = get_brightness(backlight, "backlight")
-  return statusd("brightness",
-                 backlight,
-                 normal_color if b is not None else degraded_color,
+  return statusd(normal if b is not None else degraded,
                  "☀ " + str(b) + "%" if b is not None else "☀")
 
-def statusd(name,instance,color,text,max_text=None):
+def statusd(color, text):
   return ''.join([
-    "{\"name\":\"",
-    str(name),
-    "\",\"instance\":\"",
-    str(instance),
-    "\",\"color\":\"",
+    "{\"color\":\"",
     str(color),
     "\",\"full_text\":\"",
     str(text),
     "\"}"
   ])
-
-# TODO: Screen brightness adjustment via ALS:
-# /sys/devices/platform/applesmc.768/light
 
 main_parser = ArgumentParser(description="Control a Linux desktop without a DE.")
 subparsers = main_parser.add_subparsers(title="commands", dest="command")
@@ -383,12 +343,12 @@ brightness_parser.add_argument("--upper-threshold", metavar="INTEGER", help="The
 i3bar_parser = subparsers.add_parser("i3bar", help="i3bar-compliant status bar daemon")
 i3bar_parser.add_argument("--date-format", metavar="FORMAT", help="Display a strftime in the statusbar using FORMAT", default="%-m.%-d.%y   %-I:%M %p")
 i3bar_parser.add_argument("--refresh-interval", metavar="FLOAT", help="Set the refresh interval", type=float, default=0.5)
-i3bar_parser.add_argument("--color-full", metavar="HEXCOLOR", help="The default color of text on the status bar", default="#FFFFFF")
-i3bar_parser.add_argument("--color-half-full", metavar="HEXCOLOR", help="Text color used to indicate something is changing for the better", default="#BDC1DB")
-i3bar_parser.add_argument("--color-empty", metavar="HEXCOLOR", help="Text color used to indicate a dire condition", default="#B87A84")
-i3bar_parser.add_argument("--color-half-empty", metavar="HEXCOLOR", help="Text color used when something is changing (or changed) for the worse", default="#AAAAAA")
+i3bar_parser.add_argument("--color", metavar="HEXCOLOR", help="Default text color", default="#FFFFFF")
+i3bar_parser.add_argument("--color-improving", metavar="HEXCOLOR", help="Text color used to indicate something is improving", default="#BDC1DB")
+i3bar_parser.add_argument("--color-dire", metavar="HEXCOLOR", help="Text color used to indicate a dire condition", default="#B87A84")
+i3bar_parser.add_argument("--color-degrading", metavar="HEXCOLOR", help="Text color used when something is changing (or changed) for the worse", default="#AAAAAA")
 i3bar_parser.add_argument("--power-supply", metavar="POWER_SUPPLY", help="Power supply for which to report percentage", default="BAT0")
 i3bar_parser.add_argument("--wifi-iface", metavar="INTERFACE", help="Wi-Fi interface for which to report status", default="wlp3s0")
+i3bar_parser.add_argument("--vpn-iface", metavar="INTERFACE", help="VPN/tunnel interface for which to report status", default="tun0") # NetworkManager defaults VPN connections to tun0
 i3bar_parser.add_argument("--backlight", metavar="NAME", help="The name of your backlight in /sys/class/backlight", default="intel_backlight")
-i3bar_parser.add_argument("--enable-clicks", help="Enable clicks from i3bar", action="store_true")
 main(main_parser.parse_args())
