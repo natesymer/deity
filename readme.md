@@ -13,6 +13,9 @@ Dependencies:
 
 Provides complete functionality for controlling your desktop.
 
+For brightness control (write access), you need to add the udev `90-backlight.rules`,
+then add your user to the video group.
+
 
 KBMAPPER.PY
 =
