@@ -3,19 +3,9 @@ Deity
 
 DE features without a DE.
 
-DESKTOP.PY
-=
-
-Dependencies:
-
-
-- `pulsectl`
-
-Provides complete functionality for controlling your desktop.
-
-For brightness control (write access), you need to add the udev `90-backlight.rules`,
-then add your user to the video group.
-
+First, make sure you have libpulse and pulseaudio installed. Then,
+`pip install -r requirements.txt`. Finally, you can run `pip install .`
+Also note that the brightness functionality needs to be enabled. Included is a udev rule that can help. It grants access to /sys/class/backlight/intel_backlight/brightness & friends to a group called video. You must add your user to video.
 
 KBMAPPER.PY
 =
