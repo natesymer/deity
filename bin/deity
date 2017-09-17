@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
 import deity.functionality
+from deity.ipc import IPCServer
 from argparse import ArgumentParser
+from thread import start_new_thread
 
 main_parser = ArgumentParser(description="Control a Linux desktop without a DE.")
 subparsers = main_parser.add_subparsers(title="commands", dest="command")
@@ -12,35 +14,38 @@ screenshot_parser.add_argument("--destination", help="Where to save the screensh
 audio_parser = subparsers.add_parser("audio", help="control audio")
 audio_parser.add_argument("--adjust-volume", metavar="INTEGER", help="Adjust audo volume", type=int)
 audio_parser.add_argument("--toggle-mute", help="Toggle audo mute", action="store_true")
-audio_parser.add_argument("--toggle-mic", help="Toggle microphone", action="store_true")
 audio_parser.add_argument("--output", metavar="INTEGER", help="Set the active audio sink", type=int)
 audio_parser.add_argument("--input", metavar="INTEGER", help="Set the active audio source", type=int)
 audio_parser.add_argument("--list-outputs", help="Print a listing of sinks", action='store_true')
 audio_parser.add_argument("--sanitize", help="Ensure all sources of audio use the default sink", action='store_true')
 
 brightness_parser = subparsers.add_parser("brightness", help="control brightness")
-brightness_parser.add_argument("--backlight", metavar="NAME", help="The name of your backlight in /sys/class/<SYSCLASS>", default="intel_backlight")
-brightness_parser.add_argument("--backlight-class", metavar="SYSCLASS", help="The class of your backlight in /sys/class/", default="backlight")
-brightness_parser.add_argument("--adjust", metavar="INTEGER", help="Adjust the brightness by INTEGER")
-brightness_parser.add_argument("--set", metavar="INTEGER", help="Set the brightness to INTEGER")
-brightness_parser.add_argument("--auto", help="Use the built-in ALS to adjust brightness", action="store_true")
-brightness_parser.add_argument("--lower-threshold", metavar="INTEGER", help="The minimum brightness to use", type=int, default=10)
-brightness_parser.add_argument("--upper-threshold", metavar="INTEGER", help="The maximum brightness to use", type=int, default=90)
+brightness_parser.add_argument("--backlight", metavar="NAME", help="The name of your backlight in /sys/class/<SYSCLASS>")
+brightness_parser.add_argument("--backlight-class", metavar="SYSCLASS", help="The class of your backlight in /sys/class/")
+brightness_parser.add_argument("--adjust", metavar="INTEGER", help="Adjust the brightness by INTEGER", type=int)
+brightness_parser.add_argument("--set", metavar="INTEGER", help="Set the brightness to INTEGER", type=int)
 
 i3bar_parser = subparsers.add_parser("i3bar", help="i3bar-compliant status bar daemon")
-i3bar_parser.add_argument("--date-format", metavar="FORMAT", help="Display a strftime in the statusbar using FORMAT", default="%-m.%-d.%y   %-I:%M %p")
-i3bar_parser.add_argument("--refresh-interval", metavar="FLOAT", help="Set the refresh interval", type=float, default=0.5)
-i3bar_parser.add_argument("--color", metavar="HEXCOLOR", help="Default text color", default="#FFFFFF")
-i3bar_parser.add_argument("--color-improving", metavar="HEXCOLOR", help="Text color used to indicate something is improving", default="#BDC1DB")
-i3bar_parser.add_argument("--color-dire", metavar="HEXCOLOR", help="Text color used to indicate a dire condition", default="#B87A84")
-i3bar_parser.add_argument("--color-degrading", metavar="HEXCOLOR", help="Text color used when something is changing (or changed) for the worse", default="#AAAAAA")
-i3bar_parser.add_argument("--power-supply", metavar="POWER_SUPPLY", help="Power supply for which to report percentage", default="BAT0")
-i3bar_parser.add_argument("--wifi-iface", metavar="INTERFACE", help="Wi-Fi interface for which to report status", default="wlp3s0")
-i3bar_parser.add_argument("--vpn-iface", metavar="INTERFACE", help="VPN/tunnel interface for which to report status", default="tun0") # NetworkManager defaults VPN connections to tun0
-i3bar_parser.add_argument("--backlight", metavar="NAME", help="The name of your backlight in /sys/class/backlight", default="intel_backlight")
+i3bar_parser.add_argument("--date-format", metavar="FORMAT", help="Display a strftime in the statusbar using FORMAT")
+i3bar_parser.add_argument("--refresh-interval", metavar="FLOAT", help="Set the refresh interval", type=float)
+i3bar_parser.add_argument("--color-positive", metavar="HEXCOLOR", help="Default text color")
+i3bar_parser.add_argument("--color-negative", metavar="HEXCOLOR", help="Text color used to indicate a negative condition")
+i3bar_parser.add_argument("--color-neutral", metavar="HEXCOLOR", help="Text color used to indicate a neutral condition")
+i3bar_parser.add_argument("--power-supply", metavar="POWER_SUPPLY", help="Power supply for which to report percentage")
+i3bar_parser.add_argument("--wifi-iface", metavar="INTERFACE", help="Wi-Fi interface for which to report status")
+i3bar_parser.add_argument("--vpn-iface", metavar="INTERFACE", help="VPN/tunnel interface for which to report status")
+i3bar_parser.add_argument("--backlight", metavar="NAME", help="/sys/class/<CLASS>/<NAME>")
+i3bar_parser.add_argument("--backlight-class", metavar="CLASS", help="/sys/class/<CLASS>/<NAME>")
 main(main_parser.parse_args())
 
-args = main_parser.parse_args()
-command = args.command
-del args.command
+args = main_parser.parse_args().__dict__
+command = args["command"]
+del args["command"]
+
+if command is "i3bar":
+  def runipc():
+    s = IPCServer("/tmp/deity.ipc.sock")
+    s.start()
+  start_new_thread(runipc)
+
 Functionality(args.command).go(**{k: v for k, v in args if bool(v) and v is not None})

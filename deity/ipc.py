@@ -3,6 +3,7 @@ import sys
 import socket
 from socket import socket, AF_UNIX, SOCK_STREAM
 import json
+import .functionality
 
 class IPCClient(object):
   def __init__(self, sockfile):
@@ -53,5 +54,6 @@ class IPCServer(object):
     os.remove(self.sockfile)
 
   def handle_command(self, cmd):
-    print(cmd)
+    kwargs = cmd["kwargs"]
+    Functionality(cmd["name"]).go(**kwargs)
 
