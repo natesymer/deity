@@ -14,10 +14,9 @@ screenshot_parser.add_argument("--destination", help="Where to save the screensh
 audio_parser = subparsers.add_parser("audio", help="control audio")
 audio_parser.add_argument("--adjust-volume", metavar="INTEGER", help="Adjust audo volume", type=int)
 audio_parser.add_argument("--toggle-mute", help="Toggle audo mute", action="store_true")
-audio_parser.add_argument("--output", metavar="INTEGER", help="Set the active audio sink", type=int)
-audio_parser.add_argument("--input", metavar="INTEGER", help="Set the active audio source", type=int)
+audio_parser.add_argument("--output", metavar="NAME", help="Set the active audio sink", type=str)
+audio_parser.add_argument("--input", metavar="INTEGER", help="Set the active audio source", type=str)
 audio_parser.add_argument("--list-outputs", help="Print a listing of sinks", action='store_true')
-audio_parser.add_argument("--sanitize", help="Ensure all sources of audio use the default sink", action='store_true')
 
 brightness_parser = subparsers.add_parser("brightness", help="control brightness")
 brightness_parser.add_argument("--backlight", metavar="NAME", help="The name of your backlight in /sys/class/<SYSCLASS>")
@@ -53,4 +52,4 @@ if command is "i3bar":
   t.daemon = True
   t.start()
 
-Functionality(command).go(**{k: v for k, v in args if bool(v) and v is not None})
+Functionality(command).go(**dict((k,v) for k,v in args.items() if bool(v) and v is not None))

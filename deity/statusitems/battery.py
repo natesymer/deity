@@ -1,9 +1,8 @@
 from ..filesystem import read_sys
 from ..statusbar import StatusItem, Color
-from math import floor
 
 class Battery(StatusItem):
-  def __init__(self, power_supply = "BAT0"):
+  def __init__(self, power_supply = "BAT0", **kwargs):
     super().__init__()
     self.power_supply = power_supply
 
@@ -18,7 +17,7 @@ class Battery(StatusItem):
     f = self.read("charge_full")
     if n is None or f is None:
       return -1
-    return int(floor(float(n) / float(f)) * 100)
+    return int((float(n) / float(f)) * 100.0)
 
   def full_text(self):
     return "BAT " + str(self.percent()) + "%"
@@ -27,7 +26,7 @@ class Battery(StatusItem):
     p = self.percent()
     c = self.is_charging()
     
-    if not p or not c or (p <= 20 and not c):
+    if not p or (p <= 20 and not c):
       return Color.NEGATIVE
     return Color.POSITIVE
   

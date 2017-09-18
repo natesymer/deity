@@ -1,19 +1,21 @@
 from .hardware.audio import Audio, Input, Output, Stream
 from time import sleep
 import json
+import sys
+import os
 from deity.statusitems.date import Date
 from deity.statusitems.volume import Volume
 from deity.statusitems.network import Network
 from deity.statusitems.brightness import Brightness
 from deity.statusitems.battery import Battery
 from deity.statusbar import StatusBar
+from deity.hardware.brightness import get_brightness, set_brightness
 
 # TODO: call IPC when any of these change values.
 # { "command": "i3bar", "kwargs": {} }
 # will update the statusbar
 
 def Functionality(key):
-  print(key)
   return {
     "audio": AudioFunctionality,
     "brightness": BrightnessFunctionality,
@@ -25,7 +27,7 @@ class AudioFunctionality(object):
   def go(self,
          list_outputs = False, toggle_mute = False,
          output = None, input = None,
-         adjust_volume = None, sanitize = False):
+         adjust_volume = None):
     with Audio("desktop.py") as a:
       if list_outputs:
         for o in a.outputs:
@@ -35,19 +37,27 @@ class AudioFunctionality(object):
         a.output.muted = not a.output.muted
 
       if output != None:
-        a.output = output
+        o = a.named_output(output)
+        if o is not None:
+          a.output = o
+          a.collect_streams()
+          for o in a.outputs:
+            if o != o:
+              o.suspend()
+        else:
+          print("output `" + output + "' doesn't exist")
+
+      if input != None:
+        i = a.named_input(input)
+        if i is not None:
+          a.input = i
+          a.collect_streams()
+          for i in a.inputs:
+            if i != a.input:
+              i.suspend()
 
       if adjust_volume != None:
         a.output.volume = a.output.volume + int(adjust_volume)
-
-      if args.sanitize:
-        a.collect_streams()
-        for o in a.outputs():
-          if o != a.output:
-            o.suspend()
-        for i in a.inputs():
-          if i != a.input:
-            i.suspend()
 
 class BrightnessFunctionality(object):
   def go(self,
@@ -55,7 +65,7 @@ class BrightnessFunctionality(object):
          backlight_class = "backlight",
          set = None, adjust = None
          ):
-    if aset is not None:
+    if set is not None:
       set_brightness(backlight, set, backlight_class)
     else:
       b = get_brightness(backlight, backlight_class)

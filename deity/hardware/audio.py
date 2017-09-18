@@ -68,6 +68,12 @@ class Audio(object):
   def output(self, o):
     self.pulse.sink_default_set(o.name)
 
+  def named_output(self, name):
+    for o in self.outputs:
+      if o.name == name:
+        return o
+    return None
+
   @property
   def inputs(self):
     """
@@ -81,7 +87,7 @@ class Audio(object):
     Current input. Otherwise identical to self.output.
     """
     default_name = self.pulse.server_info().default_source_name
-    for s in self.inputs():
+    for s in self.inputs:
       if s.name == default_name:
         return s
     return None
@@ -89,6 +95,12 @@ class Audio(object):
   @input.setter
   def input(self, i):
     self.pulse.source_default_set(i.name)
+
+  def named_input(self, name):
+    for i in self.inputs:
+      if i.name == name:
+        return i
+    return None
 
   def input_streams(self):
     return list(map(lambda x: Stream(x, self.pulse, "input"), self.pulse.source_output_list()))
@@ -131,7 +143,7 @@ class Primitive(object):
 
   @muted.setter
   def muted(self, v):
-    self._mute_func()(self.prim.index, int(bool(m)))
+    self._mute_func()(self.prim.index, int(bool(v)))
 
   @property
   def volume(self):

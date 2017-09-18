@@ -10,10 +10,13 @@ class Color(Enum):
   NEUTRAL = 2
   NEGATIVE = 3
 
+def eprint(*args, **kwargs):
+  print(*args, file=sys.stderr, **kwargs)
+
 class StatusBar(object):
   def __init__(self,
                clicks_enabled = True,
-               refresh_interval = 0.5,
+               refresh_interval = 3.0,
                positive_color = "#FFFFFF",
                neutral_color = "#AAAAAA",
                negative_color = "#B87A84",
@@ -28,8 +31,8 @@ class StatusBar(object):
 
   def header(self):
     if self.clicks_enabled:
-      return "{\"version\":1,\"click_events\":true}\n[\n"
-    return "{\"version\":1}\n[\n"
+      return "{\"version\":1,\"click_events\":true}\n"
+    return "{\"version\":1}\n"
 
   def to_dict(self, item):
     c = item.color()
@@ -49,36 +52,43 @@ class StatusBar(object):
     }
 
   def __str__(self):
-    return json.dumps(list(map(self.to_dict, self.items))) + '\n'
+    return json.dumps(list(map(self.to_dict, self.items)))
 
   def print(self):
-    sys.stdout.write(',' + str(self))
+    sys.stdout.write(str(self) + ",\n")
     sys.stdout.flush()
 
   def run(self):
-    sys.stdout.write(self.header() + str(self))
+    sys.stdout.write(self.header() + "[\n")
     sys.stdout.flush()
+
     if self.clicks_enabled:
       t = Thread(target=self.read_clicks)
       t.daemon = True # no point in reading clicks for a nonexistant statusbar.
       t.start()
+
+    self.print()
     sleep(self.refresh_interval) 
     while True:
-      sys.stdout.write(',' + str(self))
-      sys.stdout.flush()
+      self.print()
       sleep(self.refresh_interval)
 
   def read_clicks(self):
     while True:
-      s = sys.stdin.read()
-      if s is not None and len(s) > 0:
-        v = json.load(s)
-        instance = str(v["instance"])
-        button = int(v["button"])
-        if button == 1:
-          for i in self.items:
-            if i.guid == instance:
-              i.on_click()
+      for s in sys.stdin:
+        j = s.strip()
+
+        if s is not None and len(s) > 0:
+          if j == "[":
+            pass
+          else:
+            v = json.loads(s)
+            instance = str(v["instance"])
+            button = int(v["button"])
+            if button == 1:
+              for i in self.items:
+                if i.guid == instance:
+                  i.on_click()
     
 class StatusItem(object):
   def __init__(self, **kwargs):

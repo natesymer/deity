@@ -7,6 +7,6 @@ setup(name='deity',
       author='Nate Symer',
       author_email='nate@symer.io',
       license='MIT',
-      packages=['deity'],
+      packages=['deity', 'deity.hardware', 'deity.statusitems'],
       scripts=['bin/deity'],
       zip_safe=False)

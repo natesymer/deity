@@ -2,7 +2,7 @@ from ..statusbar import StatusItem, Color
 from ..hardware.brightness import get_brightness, set_brightness
 
 class Brightness(StatusItem):
-  def __init__(self, backlight = "intel_backlight", backlight_class = "backlight"):
+  def __init__(self, backlight = "intel_backlight", backlight_class = "backlight", **kwargs):
     super().__init__()
     self.backlight = backlight
     self.backlight_class = backlight_class
