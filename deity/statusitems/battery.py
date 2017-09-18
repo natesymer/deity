@@ -1,8 +1,9 @@
 from ..filesystem import read_sys
-from ..statusbar import StatusItem
+from ..statusbar import StatusItem, Color
+from math import floor
 
 class Battery(StatusItem):
-  def __init__(self, power_supply = "BAT0")
+  def __init__(self, power_supply = "BAT0"):
     super().__init__()
     self.power_supply = power_supply
 

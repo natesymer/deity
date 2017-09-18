@@ -36,7 +36,7 @@ class Audio(object):
     """
     The underlying pulse object.
     """
-    return self.__class__.pulses.get(self.name, _create_pulse())
+    return self.__class__.pulses.get(self.name, None) or self._create_pulse()
 
   @pulse.setter
   def pulse(self, p):
@@ -50,7 +50,7 @@ class Audio(object):
     """
     The outputs PulseAudio can play to.
     """
-    return list(self.pulse.sink_list().map(lambda s: Output(s, self.pulse)))
+    return list(map(lambda s: Output(s, self.pulse), self.pulse.sink_list()))
 
   @property
   def output(self):
@@ -59,7 +59,7 @@ class Audio(object):
     PulseAudio's notion of a 'default sink'.
     """
     default_name = self.pulse.server_info().default_sink_name
-    for s in self.outputs():
+    for s in self.outputs:
       if s.name == default_name:
         return s
     return None
@@ -86,7 +86,7 @@ class Audio(object):
         return s
     return None
 
-  @property.setter
+  @input.setter
   def input(self, i):
     self.pulse.source_default_set(i.name)
 
@@ -129,7 +129,7 @@ class Primitive(object):
   def muted(self):
     return bool(self.prim.mute)
 
-  @property.setter
+  @muted.setter
   def muted(self, v):
     self._mute_func()(self.prim.index, int(bool(m)))
 
@@ -200,20 +200,20 @@ class Stream(Primitive):
   def _mute_func(self):
     if self.type == "input":
       return self.pulse.source_output_mute
-    elsif self.type == "output":
+    elif self.type == "output":
       return self.pulse.sink_input_list
     return NotImplemented
 
   def _suspend_func(self):
     if self.type == "input":
       return self.pulse.source_output_suspend
-    elsif self.type == "output":
+    elif self.type == "output":
       return self.pulse.sink_input_suspend
     return NotImplemented
 
   def move_to(self, target):
     if self.type == "input":
       self.pulse.sink_input_move(self.index, target.index)
-    elsif self.type == "output":
+    elif self.type == "output":
       self.pulse.source_output_move(self.index, target.index)
 

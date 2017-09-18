@@ -11,7 +11,7 @@ class Network(StatusItem):
   def is_connected(self):
     conn = False
     with open("/proc/net/if_inet6", 'r') as f:
-      conn = iface in f.read() # TODO: use faster reading technique
+      conn = self.interface in f.read() # TODO: use faster reading technique
     return conn
 
   def full_text(self):

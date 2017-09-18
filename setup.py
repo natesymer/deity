@@ -8,4 +8,5 @@ setup(name='deity',
       author_email='nate@symer.io',
       license='MIT',
       packages=['deity'],
+      scripts=['bin/deity'],
       zip_safe=False)

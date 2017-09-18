@@ -3,7 +3,7 @@ import sys
 import socket
 from socket import socket, AF_UNIX, SOCK_STREAM
 import json
-import .functionality
+import deity.functionality
 
 class IPCClient(object):
   def __init__(self, sockfile):

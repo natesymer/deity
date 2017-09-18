@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-import deity.functionality
+from deity.functionality import Functionality
 from deity.ipc import IPCServer
 from argparse import ArgumentParser
-from thread import start_new_thread
+from threading import Thread
 
 main_parser = ArgumentParser(description="Control a Linux desktop without a DE.")
 subparsers = main_parser.add_subparsers(title="commands", dest="command")
@@ -36,16 +36,21 @@ i3bar_parser.add_argument("--wifi-iface", metavar="INTERFACE", help="Wi-Fi inter
 i3bar_parser.add_argument("--vpn-iface", metavar="INTERFACE", help="VPN/tunnel interface for which to report status")
 i3bar_parser.add_argument("--backlight", metavar="NAME", help="/sys/class/<CLASS>/<NAME>")
 i3bar_parser.add_argument("--backlight-class", metavar="CLASS", help="/sys/class/<CLASS>/<NAME>")
-main(main_parser.parse_args())
 
 args = main_parser.parse_args().__dict__
-command = args["command"]
-del args["command"]
+
+if "command" in args:
+  command = args["command"]
+  del args["command"]
+else:
+  command = "i3bar"
 
 if command is "i3bar":
   def runipc():
     s = IPCServer("/tmp/deity.ipc.sock")
     s.start()
-  start_new_thread(runipc)
+  t = Thread(target=runipc)
+  t.daemon = True
+  t.start()
 
-Functionality(args.command).go(**{k: v for k, v in args if bool(v) and v is not None})
+Functionality(command).go(**{k: v for k, v in args if bool(v) and v is not None})

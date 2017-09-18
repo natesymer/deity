@@ -2,7 +2,8 @@ import sys
 import json
 from enum import Enum
 from uuid import uuid4
-from thread import start_new_thread
+from threading import Thread
+from time import sleep
 
 class Color(Enum):
   POSITIVE = 1
@@ -15,11 +16,15 @@ class StatusBar(object):
                refresh_interval = 0.5,
                positive_color = "#FFFFFF",
                neutral_color = "#AAAAAA",
-               negative_color = "#B87A84"
-               *args):
+               negative_color = "#B87A84",
+               items = []):
     super().__init__()
-    self.items = args
+    self.items = items
+    self.refresh_interval = refresh_interval
     self.clicks_enabled = clicks_enabled
+    self.positive_color = positive_color
+    self.neutral_color = neutral_color
+    self.negative_color = negative_color
 
   def header(self):
     if self.clicks_enabled:
@@ -28,17 +33,18 @@ class StatusBar(object):
 
   def to_dict(self, item):
     c = item.color()
+    chex = None
     if c == Color.POSITIVE:
-      ch = positive_color
+      chex = self.positive_color
     elif c == Color.NEUTRAL:
-      ch = neutral_color
+      chex = self.neutral_color
     elif c == Color.NEGATIVE:
-      ch = negative_color
+      chex = self.negative_color
 
     return {
       "instance": item.guid,
-      "color": ch or "#FFFFFF",
-      "full_text": str(item.full_text),
+      "color": chex or "#FFFFFF",
+      "full_text": str(item.full_text()),
       "markup": "pango" if item.is_markup() else "none"
     }
 
@@ -53,28 +59,31 @@ class StatusBar(object):
     sys.stdout.write(self.header() + str(self))
     sys.stdout.flush()
     if self.clicks_enabled:
-      start_new_thread(self.read_clicks)
-    sleep(refresh_interval) 
+      t = Thread(target=self.read_clicks)
+      t.daemon = True # no point in reading clicks for a nonexistant statusbar.
+      t.start()
+    sleep(self.refresh_interval) 
     while True:
       sys.stdout.write(',' + str(self))
       sys.stdout.flush()
-      sleep(refresh_interval)
+      sleep(self.refresh_interval)
 
   def read_clicks(self):
-    s = sys.stdin.read()
-    if s is not None and len(s) > 0:
-      v = json.load(s)
-      instance = str(v["instance"])
-      button = int(v["button"])
-      if button == 1:
-        for i in self.items:
-          if i.guid == instance:
-            i.on_click()
+    while True:
+      s = sys.stdin.read()
+      if s is not None and len(s) > 0:
+        v = json.load(s)
+        instance = str(v["instance"])
+        button = int(v["button"])
+        if button == 1:
+          for i in self.items:
+            if i.guid == instance:
+              i.on_click()
     
 class StatusItem(object):
   def __init__(self, **kwargs):
     super().__init__()
-    self.guid = uuid4()
+    self.guid = str(uuid4())
 
   def is_markup(self):
     return False

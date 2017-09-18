@@ -1,5 +1,5 @@
 from ..statusbar import StatusItem, Color
-from ..audio import Audio
+from ..hardware.audio import Audio
 
 class Volume(StatusItem):
   def __init__(self, **kwargs):
@@ -12,4 +12,4 @@ class Volume(StatusItem):
     return Color.POSITIVE
 
   def full_text(self):
-    return "VOL " + str(audio.output.volume) + "%"
+    return "VOL " + str(self.audio.output.volume) + "%"

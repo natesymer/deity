@@ -1,23 +1,25 @@
 from .hardware.audio import Audio, Input, Output, Stream
 from time import sleep
 import json
-from .statusbar.date import Date
-from .statusbar.volume import Volume
-from .statusbar.network import Network
-from .statusbar.brightness import Brightness
-from .statusbar.battery import Battery
+from deity.statusitems.date import Date
+from deity.statusitems.volume import Volume
+from deity.statusitems.network import Network
+from deity.statusitems.brightness import Brightness
+from deity.statusitems.battery import Battery
+from deity.statusbar import StatusBar
 
 # TODO: call IPC when any of these change values.
 # { "command": "i3bar", "kwargs": {} }
 # will update the statusbar
 
 def Functionality(key):
+  print(key)
   return {
     "audio": AudioFunctionality,
     "brightness": BrightnessFunctionality,
     "screenshot": ScreenshotFunctionality,
     "i3bar": i3barFunctionality
-  }[key]()
+  }.get(key, i3barFunctionality)()
 
 class AudioFunctionality(object):
   def go(self,
@@ -71,19 +73,21 @@ class ScreenshotFunctionality(object):
     os.system("mkdir -p " + destination)
     os.system("swaygrab " + destination.rstrip('/') + time.strftime("/%-m-%-d-%y_%-H:%M:%S.png"))
 
+statusbar = None
+
 class i3barFunctionality(object):
   def go(self, **kwargs):
     global statusbar
     if not statusbar: 
-      items = [
-        Brightness(backlight = "intel_backlight", backlight_class = "backlight"),
-        Volume(),
-        Battery(**kwargs)
+      statusbar = StatusBar(items = [
+        Brightness(backlight = kwargs.get("backlight", "intel_backlight"),
+                   backlight_class = kwargs.get("backlight_class", "backlight")),
+        Volume(**kwargs),
+        Battery(**kwargs),
         Network(text = "WiFi", interface = kwargs.get("wifi_iface", "wlp3s0")),
         Network(text = "VPN", interface = kwargs.get("vpn_iface", "tun0")),
         Date(**kwargs)
-      ]
-      statusbar = StatusBar(**kwargs, *items)
+      ], **kwargs)
       statusbar.run()
     else:
       statusbar.print()

@@ -1,4 +1,4 @@
-from ..statusbar import StatusItem
+from ..statusbar import StatusItem, Color
 from ..hardware.brightness import get_brightness, set_brightness
 
 class Brightness(StatusItem):
