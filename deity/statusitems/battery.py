@@ -6,27 +6,23 @@ class Battery(StatusItem):
     super().__init__()
     self.power_supply = power_supply
 
-  def read(self, fname):
-    return read_sys("power_supply", self.power_supply, fname)
-
-  def is_charging(self):
-    return self.read("status") == "Charging"
-
-  def percent(self):
+  def refresh(self):
+    self.is_charging = self.read("status") == "Charging"
     n = self.read("charge_now")
     f = self.read("charge_full")
     if n is None or f is None:
-      return -1
-    return int((float(n) / float(f)) * 100.0)
+      self.percent -1
+    else:
+      self.percent = int((float(n) / float(f)) * 100.0)
+
+  def read(self, fname):
+    return read_sys("power_supply", self.power_supply, fname)
 
   def full_text(self):
-    return "BAT " + str(self.percent()) + "%"
+    return "BAT " + str(self.percent) + "%"
 
   def color(self):
-    p = self.percent()
-    c = self.is_charging()
-    
-    if not p or (p <= 20 and not c):
+    if self.percent <= 20 and not self.is_charging:
       return Color.NEGATIVE
     return Color.POSITIVE
   

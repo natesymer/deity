@@ -7,14 +7,16 @@ class Brightness(StatusItem):
     self.backlight = backlight
     self.backlight_class = backlight_class
 
+  def refresh(self):
+    self.brightness = get_brightness(self.backlight,
+                                     self.backlight_class)    
+
   def full_text(self):
-    b = get_brightness(self.backlight, self.backlight_class)
-    if b is None:
+    if self.brightness is None:
       return "BRIGHT"
-    return "BRIGHT " + str(b) + "%"    
+    return "BRIGHT " + str(self.brightness) + "%"
 
   def color(self):
-    b = get_brightness(self.backlight, self.backlight_class)
-    if b is None:
+    if self.brightness is None:
       return Color.NEGATIVE
     return Color.POSITIVE

@@ -35,6 +35,7 @@ class StatusBar(object):
     return "{\"version\":1}\n"
 
   def to_dict(self, item):
+    item.refresh()
     c = item.color()
     chex = None
     if c == Color.POSITIVE:
@@ -105,4 +106,10 @@ class StatusItem(object):
     return Color.POSITIVE
 
   def on_click(self):
+    pass
+
+  def refresh(self):
+    """
+    Refresh the state of the item
+    """
     pass

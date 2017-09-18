@@ -1,4 +1,5 @@
-from pulsectl import Pulse
+from pulsectl import Pulse, PulseSinkInfo
+import pulsectl._pulsectl as c
 
 class Audio(object):
   """
@@ -25,9 +26,18 @@ class Audio(object):
       self.pulse.close()
       self.pulse = None
 
+  def _make_pa_method(self, obj, name, args, ret):
+    dll = c.CDLL('libpulse.so.0')
+    func = c.pa._func_wrapper('name', getattr(dll, name), args)
+    return Pulse._pulse_get_list(c.PA_SINK_INFO_CB_T, func, ret).__get__(obj, obj.__class__)    
+    
   # INTERNAL
   def _create_pulse(self):
     p = Pulse(self.name)
+    p.get_sink_by_name = self._make_pa_method(p,
+                                              "pa_context_get_sink_info_by_name",
+                                              [c.POINTER(c.PA_CONTEXT), c.c_str_p, c.PA_SINK_INFO_CB_T, c.c_void_p],
+                                              PulseSinkInfo)
     self.__class__.pulses[self.name] = p
     return p
 
@@ -58,21 +68,16 @@ class Audio(object):
     Current output. This functionality is mediated by
     PulseAudio's notion of a 'default sink'.
     """
-    default_name = self.pulse.server_info().default_sink_name
-    for s in self.outputs:
-      if s.name == default_name:
-        return s
-    return None
+    return p.get_sink_by_name("@DEFAULT_SINK@")
+#    default_name = self.pulse.server_info().default_sink_name
+#    for s in self.outputs:
+#      if s.name == default_name:
+#        return s
+#    return None
 
   @output.setter
   def output(self, o):
-    self.pulse.sink_default_set(o.name)
-
-  def named_output(self, name):
-    for o in self.outputs:
-      if o.name == name:
-        return o
-    return None
+    self.pulse.sink_default_set(o)
 
   @property
   def inputs(self):
@@ -94,13 +99,7 @@ class Audio(object):
 
   @input.setter
   def input(self, i):
-    self.pulse.source_default_set(i.name)
-
-  def named_input(self, name):
-    for i in self.inputs:
-      if i.name == name:
-        return i
-    return None
+    self.pulse.source_default_set(i)
 
   def input_streams(self):
     return list(map(lambda x: Stream(x, self.pulse, "input"), self.pulse.source_output_list()))

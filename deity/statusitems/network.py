@@ -8,17 +8,19 @@ class Network(StatusItem):
       raise ValueError("Network(): expected interface parameter.")
     self.interface = interface
 
-  def is_connected(self):
-    conn = False
-    with open("/proc/net/if_inet6", 'r') as f:
-      conn = self.interface in f.read() # TODO: use faster reading technique
-    return conn
+  def refresh(self):
+    self.connected = False
+    try:
+      with open("/proc/net/if_inet6", 'r') as f:
+        self.connected = self.interface in f.read() # TODO: use faster reading technique
+    except:
+      self.connected = False
 
   def full_text(self):
     return self.text
 
   def color(self):
-    if self.is_connected():
+    if self.connected:
       return Color.POSITIVE
     else:
       return Color.NEGATIVE

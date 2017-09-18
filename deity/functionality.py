@@ -35,15 +35,11 @@ class AudioFunctionality(object):
         a.output.muted = not a.output.muted
 
       if output != None:
-        o = a.named_output(output)
-        if o is not None:
-          a.output = o
-          a.collect_streams()
-          for o in a.outputs:
-            if o != o:
-              o.suspend()
-        else:
-          print("output `" + output + "' doesn't exist")
+        a.output = output
+        a.collect_streams()
+        for o in a.outputs:
+          if o.name != output:
+            o.suspend()
 
       if input != None:
         i = a.named_input(input)
