@@ -3,15 +3,13 @@ Deity
 
 DE features without a DE.
 
-First, make sure you have libpulse and pulseaudio installed. Then,
-`pip install -r requirements.txt`. Finally, you can run `pip install .`
-Also note that the brightness functionality needs to be enabled. Included is a udev rule that can help. It grants access to /sys/class/backlight/intel_backlight/brightness & friends to a group called video. You must add your user to video.
+# Installation
 
-KBMAPPER.PY
-=
+1. Install pulseaudio and libpulse (latter should be installed automatically)
+2. `cd` into the root directory of the project.
+3. `pip install -r requirements.txt`
+4. `pip install .`
+5. cp 90-backlight.rules /etc/udev/rules.d/
+6. reboot
 
-DEPENDENCIES:
-
-- `evdev`
-
-Provides configurable keybinding functionality.
+Now you can use deity through the `deity` program on the command line. All you need is provided through help pages.
