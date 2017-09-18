@@ -1,8 +1,10 @@
-from .hardware.audio import Audio, Input, Output, Stream
 from time import sleep
 import json
 import sys
 import os
+from socket import socket, AF_UNIX, SOCK_STREAM
+from threading import Thread
+from deity.hardware.audio import Audio, Input, Output, Stream
 from deity.statusitems.date import Date
 from deity.statusitems.volume import Volume
 from deity.statusitems.network import Network
@@ -10,10 +12,6 @@ from deity.statusitems.brightness import Brightness
 from deity.statusitems.battery import Battery
 from deity.statusbar import StatusBar
 from deity.hardware.brightness import get_brightness, set_brightness
-
-# TODO: call IPC when any of these change values.
-# { "command": "i3bar", "kwargs": {} }
-# will update the statusbar
 
 def Functionality(key):
   return {
@@ -58,6 +56,8 @@ class AudioFunctionality(object):
 
       if adjust_volume != None:
         a.output.volume = a.output.volume + int(adjust_volume)
+      
+      tickle_i3bar()
 
 class BrightnessFunctionality(object):
   def go(self,
@@ -78,27 +78,57 @@ class BrightnessFunctionality(object):
         sys.stdout.write("failed to read brightness.\n")
       sys.stdout.flush()
 
+    tickle_i3bar()
+
 class ScreenshotFunctionality(object):
   def go(self, destination = "~/Pictures/screenshots"):
     os.system("mkdir -p " + destination)
     os.system("swaygrab " + destination.rstrip('/') + time.strftime("/%-m-%-d-%y_%-H:%M:%S.png"))
 
-statusbar = None
+def tickle_i3bar(path = "/tmp/deity.i3bar.sock"):
+  s = socket(AF_UNIX, SOCK_STREAM)
+  s.connect(path)
+  s.send(b'foo')
+  s.close()
 
 class i3barFunctionality(object):
+  def runipc(self):
+    if os.path.exists(self.socketfile):
+      os.remove(self.socketfile)
+
+    s = socket(AF_UNIX, SOCK_STREAM)
+    s.bind(self.socketfile)
+    s.listen(5)
+
+    while True:
+      conn, addr = s.accept()
+      data = b''
+      while True:
+        bs = conn.recv(4096)
+        if not bs:
+          break
+        else:
+          data += bs
+
+      if len(data) > 0:
+        self.statusbar.print()
+
+    os.remove(self.socketfile)
+
   def go(self, **kwargs):
-    global statusbar
-    if not statusbar: 
-      statusbar = StatusBar(items = [
-        Brightness(backlight = kwargs.get("backlight", "intel_backlight"),
+    self.socketfile = kwargs.get("socket_file", "/tmp/deity.i3bar.sock")
+    self.statusbar = StatusBar(items = [
+      Brightness(backlight = kwargs.get("backlight", "intel_backlight"),
                    backlight_class = kwargs.get("backlight_class", "backlight")),
-        Volume(**kwargs),
-        Battery(**kwargs),
-        Network(text = "WiFi", interface = kwargs.get("wifi_iface", "wlp3s0")),
-        Network(text = "VPN", interface = kwargs.get("vpn_iface", "tun0")),
-        Date(**kwargs)
-      ], **kwargs)
-      statusbar.run()
-    else:
-      statusbar.print()
+      Volume(**kwargs),
+      Battery(**kwargs),
+      Network(text = "WiFi", interface = kwargs.get("wifi_iface", "wlp3s0")),
+      Network(text = "VPN", interface = kwargs.get("vpn_iface", "tun0")),
+      Date(**kwargs)
+    ], **kwargs)
+    t = Thread(target=self.runipc)
+    t.daemon = True
+    t.start()
+
+    self.statusbar.run()
 
