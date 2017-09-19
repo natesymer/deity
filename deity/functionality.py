@@ -2,6 +2,9 @@ from time import sleep
 import json
 import sys
 import os
+import pwd
+import re
+from uuid import uuid4
 from socket import socket, AF_UNIX, SOCK_STREAM
 from threading import Thread
 from deity.hardware.audio import Audio, Input, Output, Stream
@@ -81,14 +84,24 @@ class ScreenshotFunctionality(object):
     os.system("mkdir -p " + destination)
     os.system("swaygrab " + destination.rstrip('/') + time.strftime("/%-m-%-d-%y_%-H:%M:%S.png"))
 
-def tickle_i3bar(path = "/tmp/deity.i3bar.sock"):
-  s = socket(AF_UNIX, SOCK_STREAM)
-  s.connect(path)
-  s.send(b'foo')
-  s.close()
+sockregex = re.compile(r'deity\.([^.]*)\.([^.]*)\.sock')
+def tickle_i3bar():
+  print("TICKLE", file=sys.stderr)
+  for fn in os.listdir('/tmp'):
+    res = sockregex.match(fn)
+    
+    if res is not None:
+      name, guid = res.groups()
+      print(name, file=sys.stderr)
+      if name == pwd.getpwuid(os.getuid())[0]:
+        s = socket(AF_UNIX, SOCK_STREAM)
+        s.connect('/tmp/' + fn)
+        s.send(b'foo')
+        s.close()
 
 class i3barFunctionality(object):
   def runipc(self):
+    self.socketfile = "/tmp/deity." + pwd.getpwuid(os.getuid())[0] + "."+ str(uuid4()) + ".sock"
     if os.path.exists(self.socketfile):
       os.remove(self.socketfile)
 

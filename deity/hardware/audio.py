@@ -1,4 +1,4 @@
-from pulsectl import Pulse, PulseSinkInfo
+from pulsectl import Pulse, PulseSinkInfo, PulseSourceInfo
 import pulsectl._pulsectl as c
 
 class Audio(object):
@@ -38,6 +38,10 @@ class Audio(object):
                                               "pa_context_get_sink_info_by_name",
                                               [c.POINTER(c.PA_CONTEXT), c.c_str_p, c.PA_SINK_INFO_CB_T, c.c_void_p],
                                               PulseSinkInfo)
+    p.get_source_by_name = self._make_pa_method(p,
+                                               "pa_context_get_source_info_by_name",
+                                               [c.POINTER(c.PA_CONTEXT), c.c_str_p, c.PA_SOURCE_INFO_CB_T, c.c_void_p],
+                                               PulseSourceInfo)
     self.__class__.pulses[self.name] = p
     return p
 
@@ -68,12 +72,10 @@ class Audio(object):
     Current output. This functionality is mediated by
     PulseAudio's notion of a 'default sink'.
     """
-    return p.get_sink_by_name("@DEFAULT_SINK@")
-#    default_name = self.pulse.server_info().default_sink_name
-#    for s in self.outputs:
-#      if s.name == default_name:
-#        return s
-#    return None
+    try:
+      return Output(self.pulse.get_sink_by_name("@DEFAULT_SINK@"), self.pulse)
+    except:
+      return None
 
   @output.setter
   def output(self, o):
@@ -91,11 +93,10 @@ class Audio(object):
     """
     Current input. Otherwise identical to self.output.
     """
-    default_name = self.pulse.server_info().default_source_name
-    for s in self.inputs:
-      if s.name == default_name:
-        return s
-    return None
+    try:
+      return Input(self.pulse.get_source_by_name("@DEFAULT_SOURCE@"), self.pulse)
+    except:
+      return None
 
   @input.setter
   def input(self, i):
