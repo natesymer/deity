@@ -101,31 +101,30 @@ def tickle_i3bar():
 
 class i3barFunctionality(object):
   def runipc(self):
-    self.socketfile = "/tmp/deity." + pwd.getpwuid(os.getuid())[0] + "."+ str(uuid4()) + ".sock"
-    if os.path.exists(self.socketfile):
-      os.remove(self.socketfile)
+    socketfile = "/tmp/deity." + pwd.getpwuid(os.getuid())[0] + "."+ str(uuid4()) + ".sock"
 
     s = socket(AF_UNIX, SOCK_STREAM)
-    s.bind(self.socketfile)
-    s.listen(5)
+    try:
+      s.bind(socketfile)
+      s.listen(5)
 
-    while True:
-      conn, addr = s.accept()
-      data = b''
       while True:
-        bs = conn.recv(4096)
-        if not bs:
-          break
-        else:
-          data += bs
+        conn, addr = s.accept()
+        data = b''
+        while True:
+          bs = conn.recv(4096)
+          if not bs:
+            break
+          else:
+            data += bs
 
-      if len(data) > 0:
-        self.statusbar.print()
-
-    os.remove(self.socketfile)
+        if len(data) > 0:
+          self.statusbar.print()
+    finally:
+      if os.path.exists(socketfile):
+        os.remove(socketfile)
 
   def go(self, **kwargs):
-    self.socketfile = kwargs.get("socket_file", "/tmp/deity.i3bar.sock")
     self.statusbar = StatusBar(items = [
       Brightness(backlight = kwargs.get("backlight", "intel_backlight"),
                    backlight_class = kwargs.get("backlight_class", "backlight")),

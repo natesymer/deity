@@ -26,13 +26,20 @@ class Audio(object):
       self.pulse.close()
       self.pulse = None
 
+  libpulse_so_0 = c.CDLL("libpulse.so.0")
+
   def _make_pa_method(self, obj, name, args, ret):
-    dll = c.CDLL('libpulse.so.0')
+    dll = self.__class__.libpulse_so_0
     func = c.pa._func_wrapper('name', getattr(dll, name), args)
     return Pulse._pulse_get_list(c.PA_SINK_INFO_CB_T, func, ret).__get__(obj, obj.__class__)    
     
   # INTERNAL
   def _create_pulse(self):
+    """
+    Create a PulseAudio client with self.name
+    and patch it so that it supports getting
+    sinks and sources by name. 
+    """
     p = Pulse(self.name)
     p.get_sink_by_name = self._make_pa_method(p,
                                               "pa_context_get_sink_info_by_name",
@@ -72,10 +79,10 @@ class Audio(object):
     Current output. This functionality is mediated by
     PulseAudio's notion of a 'default sink'.
     """
-    try:
-      return Output(self.pulse.get_sink_by_name("@DEFAULT_SINK@"), self.pulse)
-    except:
-      return None
+    #try:
+    return Output(self.pulse.get_sink_by_name("@DEFAULT_SINK@"), self.pulse)
+    #except:
+    #  return None
 
   @output.setter
   def output(self, o):
