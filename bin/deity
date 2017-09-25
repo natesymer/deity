@@ -34,7 +34,6 @@ i3bar_parser.add_argument("--wifi-iface", metavar="INTERFACE", help="Wi-Fi inter
 i3bar_parser.add_argument("--vpn-iface", metavar="INTERFACE", help="VPN/tunnel interface for which to report status")
 i3bar_parser.add_argument("--backlight", metavar="NAME", help="/sys/class/<CLASS>/<NAME>")
 i3bar_parser.add_argument("--backlight-class", metavar="CLASS", help="/sys/class/<CLASS>/<NAME>")
-i3bar_parser.add_argument("--socket-file", metavar="FILEPATH", help="which socket to use")
 
 args = main_parser.parse_args().__dict__
 

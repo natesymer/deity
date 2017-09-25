@@ -29,7 +29,7 @@ class AudioFunctionality(object):
          list_outputs = False, toggle_mute = False,
          output = None, input = None,
          adjust_volume = None):
-    with Audio("desktop.py") as a:
+    with Audio("deity") as a:
       if list_outputs:
         for o in a.outputs:
           print(str(o))
@@ -56,7 +56,7 @@ class AudioFunctionality(object):
       if adjust_volume != None:
         a.output.volume = a.output.volume + int(adjust_volume)
       
-      tickle_i3bar()
+    tickle_i3bar()
 
 class BrightnessFunctionality(object):
   def go(self,
@@ -86,25 +86,25 @@ class ScreenshotFunctionality(object):
 
 sockregex = re.compile(r'deity\.([^.]*)\.([^.]*)\.sock')
 def tickle_i3bar():
-  print("TICKLE", file=sys.stderr)
   for fn in os.listdir('/tmp'):
     res = sockregex.match(fn)
     
     if res is not None:
       name, guid = res.groups()
-      print(name, file=sys.stderr)
       if name == pwd.getpwuid(os.getuid())[0]:
-        s = socket(AF_UNIX, SOCK_STREAM)
-        s.connect('/tmp/' + fn)
-        s.send(b'foo')
-        s.close()
+        try:
+          s = socket(AF_UNIX, SOCK_STREAM)
+          s.connect('/tmp/' + fn)
+          s.send(b'foo')
+        finally:
+          s.close()
 
 class i3barFunctionality(object):
   def runipc(self):
     socketfile = "/tmp/deity." + pwd.getpwuid(os.getuid())[0] + "."+ str(uuid4()) + ".sock"
 
-    s = socket(AF_UNIX, SOCK_STREAM)
     try:
+      s = socket(AF_UNIX, SOCK_STREAM)
       s.bind(socketfile)
       s.listen(5)
 
@@ -112,7 +112,7 @@ class i3barFunctionality(object):
         conn, addr = s.accept()
         data = b''
         while True:
-          bs = conn.recv(4096)
+          bs = conn.recv(1024)
           if not bs:
             break
           else:

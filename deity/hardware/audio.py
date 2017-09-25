@@ -1,5 +1,4 @@
 from pulsectl import Pulse, PulseSinkInfo, PulseSourceInfo
-import pulsectl._pulsectl as c
 
 class Audio(object):
   """
@@ -24,31 +23,14 @@ class Audio(object):
     """
     if self.pulse is not None:
       self.pulse.close()
-      self.pulse = None
 
-  libpulse_so_0 = c.CDLL("libpulse.so.0")
-
-  def _make_pa_method(self, obj, name, args, ret):
-    dll = self.__class__.libpulse_so_0
-    func = c.pa._func_wrapper('name', getattr(dll, name), args)
-    return Pulse._pulse_get_list(c.PA_SINK_INFO_CB_T, func, ret).__get__(obj, obj.__class__)    
-    
   # INTERNAL
   def _create_pulse(self):
     """
-    Create a PulseAudio client with self.name
-    and patch it so that it supports getting
-    sinks and sources by name. 
+    Create a PulseAudio client with self.name.
+    Insert it into the instance cache
     """
     p = Pulse(self.name)
-    p.get_sink_by_name = self._make_pa_method(p,
-                                              "pa_context_get_sink_info_by_name",
-                                              [c.POINTER(c.PA_CONTEXT), c.c_str_p, c.PA_SINK_INFO_CB_T, c.c_void_p],
-                                              PulseSinkInfo)
-    p.get_source_by_name = self._make_pa_method(p,
-                                               "pa_context_get_source_info_by_name",
-                                               [c.POINTER(c.PA_CONTEXT), c.c_str_p, c.PA_SOURCE_INFO_CB_T, c.c_void_p],
-                                               PulseSourceInfo)
     self.__class__.pulses[self.name] = p
     return p
 
@@ -58,13 +40,6 @@ class Audio(object):
     The underlying pulse object.
     """
     return self.__class__.pulses.get(self.name, None) or self._create_pulse()
-
-  @pulse.setter
-  def pulse(self, p):
-    if not p:
-      del self.__class__.pulses[self.name]
-    else:
-      self.__class__.pulses[self.name] = p
 
   @property
   def outputs(self):
@@ -79,14 +54,17 @@ class Audio(object):
     Current output. This functionality is mediated by
     PulseAudio's notion of a 'default sink'.
     """
-    #try:
-    return Output(self.pulse.get_sink_by_name("@DEFAULT_SINK@"), self.pulse)
-    #except:
-    #  return None
+    try:
+      return Output(self.pulse.get_sink_by_name("@DEFAULT_SINK@"), self.pulse)
+    except:
+      return None
 
   @output.setter
   def output(self, o):
-    self.pulse.sink_default_set(o)
+    name = o
+    if instance(name, Output):
+      name = name.name
+    self.pulse.sink_default_set(name)
 
   @property
   def inputs(self):

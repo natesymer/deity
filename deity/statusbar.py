@@ -15,7 +15,7 @@ def eprint(*args, **kwargs):
 
 class StatusBar(object):
   def __init__(self,
-               clicks_enabled = True,
+               clicks_enabled = False,
                refresh_interval = 3.0,
                positive_color = "#FFFFFF",
                neutral_color = "#AAAAAA",
@@ -68,8 +68,6 @@ class StatusBar(object):
       t.daemon = True # no point in reading clicks for a nonexistant statusbar.
       t.start()
 
-    self.print()
-    sleep(self.refresh_interval) 
     while True:
       self.print()
       sleep(self.refresh_interval)
