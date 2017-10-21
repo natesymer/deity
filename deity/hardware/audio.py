@@ -62,7 +62,7 @@ class Audio(object):
   @output.setter
   def output(self, o):
     name = o
-    if instance(name, Output):
+    if isinstance(name, Output):
       name = name.name
     self.pulse.sink_default_set(name)
 
@@ -99,11 +99,14 @@ class Audio(object):
     """
     o = self.output
     i = self.input
-    for s in self.input_streams():
-      s.move_to(i)
+
+    if i is not None:
+      for s in self.input_streams():
+        s.move_to(i)
     
-    for s in self.output_streams():
-      s.move_to(o)
+    if o is not None:
+      for s in self.output_streams():
+        s.move_to(o)
 
 class Primitive(object):
   def __init__(self, prim, pulse):
@@ -209,8 +212,8 @@ class Stream(Primitive):
     return NotImplemented
 
   def move_to(self, target):
-    if self.type == "input":
+    if self.type == "output":
       self.pulse.sink_input_move(self.index, target.index)
-    elif self.type == "output":
+    elif self.type == "input":
       self.pulse.source_output_move(self.index, target.index)
 

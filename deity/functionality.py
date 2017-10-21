@@ -39,6 +39,7 @@ class AudioFunctionality(object):
 
       if output != None:
         a.output = output
+        a.output.enable()
         a.collect_streams()
         for o in a.outputs:
           if o.name != output:
