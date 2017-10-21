@@ -1,4 +1,4 @@
-from time import sleep
+from time import sleep, strftime
 import json
 import sys
 import os
@@ -82,20 +82,22 @@ class BrightnessFunctionality(object):
 class ScreenshotFunctionality(object):
   def go(self, destination = "~/Pictures/screenshots"):
     os.system("mkdir -p " + destination)
-    os.system("swaygrab " + destination.rstrip('/') + time.strftime("/%-m-%-d-%y_%-H:%M:%S.png"))
+    os.system("swaygrab " + destination.rstrip('/') + strftime("/%-m-%-d-%y_%-H:%M:%S.png"))
 
 sockregex = re.compile(r'deity\.([^.]*)\.([^.]*)\.sock')
 def tickle_i3bar():
+  uname = pwd.getpwuid(os.getuid())[0]
   for fn in os.listdir('/tmp'):
-    res = sockregex.match(fn)
-    
+    res = sockregex.match(fn)    
     if res is not None:
       name, guid = res.groups()
-      if name == pwd.getpwuid(os.getuid())[0]:
+      if name == uname:
         try:
           s = socket(AF_UNIX, SOCK_STREAM)
           s.connect('/tmp/' + fn)
           s.send(b'foo')
+        except Exception as e:
+          pass
         finally:
           s.close()
 
@@ -110,17 +112,24 @@ class i3barFunctionality(object):
 
       while True:
         conn, addr = s.accept()
-        data = b''
-        while True:
-          bs = conn.recv(1024)
-          if not bs:
-            break
-          else:
-            data += bs
+        try:
+          data = None
+          while True:
+            bs = conn.recv(1024)
+            if not bs:
+              break
+            else:
+              if data is None:
+                data = b'' + bs
+              else:
+                data += bs
 
-        if len(data) > 0:
-          self.statusbar.print()
+          if data is not None:
+            self.statusbar.print()
+        finally:
+          conn.close()
     finally:
+      s.close()
       if os.path.exists(socketfile):
         os.remove(socketfile)
 

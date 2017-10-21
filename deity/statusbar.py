@@ -34,23 +34,30 @@ class StatusBar(object):
       return "{\"version\":1,\"click_events\":true}\n"
     return "{\"version\":1}\n"
 
-  def to_dict(self, item):
-    item.refresh()
+  def get_color(self, item):
     c = item.color()
-    chex = None
     if c == Color.POSITIVE:
       chex = self.positive_color
     elif c == Color.NEUTRAL:
       chex = self.neutral_color
     elif c == Color.NEGATIVE:
       chex = self.negative_color
+    else:
+      chex = "#FFFFFF"
+    return chex
 
+  def to_dict(self, item):
+    item.refresh()
     return {
       "instance": item.guid,
-      "color": chex or "#FFFFFF",
+      "color": self.get_color(item),
       "full_text": str(item.full_text()),
       "markup": "pango" if item.is_markup() else "none"
     }
+
+  def to_pango(self, item):
+    item.refresh()
+    return "<span color='" + self.get_color(item) + "'>" + item.full_text() + "</span>"
 
   def __str__(self):
     return json.dumps(list(map(self.to_dict, self.items)))
@@ -104,6 +111,7 @@ class StatusItem(object):
     return Color.POSITIVE
 
   def on_click(self):
+    print("CLICKED!")
     pass
 
   def refresh(self):

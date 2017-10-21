@@ -43,4 +43,7 @@ if "command" in args:
 else:
   command = "i3bar"
 
-Functionality(command).go(**dict((k,v) for k,v in args.items() if bool(v) and v is not None))
+try:
+  Functionality(command).go(**dict((k,v) for k,v in args.items() if bool(v) and v is not None))
+except KeyboardInterrupt:
+  exit(0)
