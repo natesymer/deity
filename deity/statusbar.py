@@ -20,9 +20,11 @@ class StatusBar(object):
                positive_color = "#FFFFFF",
                neutral_color = "#AAAAAA",
                negative_color = "#B87A84",
-               items = []):
+               items = [],
+               **kwargs):
     super().__init__()
-    self.items = items
+    self.prev_string = None
+    self.items = list(map(lambda x: x(**kwargs), items))
     self.refresh_interval = refresh_interval
     self.clicks_enabled = clicks_enabled
     self.positive_color = positive_color
@@ -51,24 +53,22 @@ class StatusBar(object):
     return {
       "instance": item.guid,
       "color": self.get_color(item),
-      "full_text": str(item.full_text()),
+      "full_text": str(item),
       "markup": "pango" if item.is_markup() else "none"
     }
 
-  def to_pango(self, item):
-    item.refresh()
-    return "<span color='" + self.get_color(item) + "'>" + item.full_text() + "</span>"
-
   def __str__(self):
-    return json.dumps(list(map(self.to_dict, self.items)))
+    return json.dumps(list(map(lambda i: self.to_dict(i), self.items)))
 
   def print(self):
-    sys.stdout.write(str(self) + ",\n")
-    sys.stdout.flush()
+    s = str(self)
+    if s is not self.prev_string:
+      sys.stdout.write(s + ",\n")
+      sys.stdout.flush()
+      self.prev_string = s
 
   def run(self):
     sys.stdout.write(self.header() + "[\n")
-    sys.stdout.flush()
 
     if self.clicks_enabled:
       t = Thread(target=self.read_clicks)
@@ -82,16 +82,12 @@ class StatusBar(object):
   def read_clicks(self):
     while True:
       for s in sys.stdin:
-        j = s.strip()
-
         if s is not None and len(s) > 0:
-          if j == "[":
-            pass
-          else:
+          if s.strip() is not "[":
             v = json.loads(s)
-            instance = str(v["instance"])
             button = int(v["button"])
             if button == 1:
+              instance = str(v["instance"])
               for i in self.items:
                 if i.guid == instance:
                   i.on_click()
@@ -100,6 +96,9 @@ class StatusItem(object):
   def __init__(self, **kwargs):
     super().__init__()
     self.guid = str(uuid4())
+
+  def __str__(self):
+    return self.full_text()
 
   def is_markup(self):
     return False
@@ -112,7 +111,6 @@ class StatusItem(object):
 
   def on_click(self):
     print("CLICKED!")
-    pass
 
   def refresh(self):
     """

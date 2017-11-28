@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 
 from deity.functionality import Functionality
+from deity.statusitems.date import Date
+from deity.statusitems.volume import Volume
+from deity.statusitems.network import Network
+from deity.statusitems.brightness import Brightness
+from deity.statusitems.battery import Battery
 from argparse import ArgumentParser
-from threading import Thread
 
 main_parser = ArgumentParser(description="Control a Linux desktop without a DE.")
 subparsers = main_parser.add_subparsers(title="commands", dest="command")
@@ -43,7 +47,27 @@ if "command" in args:
 else:
   command = "i3bar"
 
+go_kwargs = dict((k,v) for k,v in args.items() if bool(v) and v is not None)
+
+if command == "i3bar":
+  wifi_iface = go_kwargs.get("wifi_iface", None)
+  if wifi_iface is not None:
+    del go_kwargs["wifi_iface"]
+
+  vpn_iface = go_kwargs.get("vpn_iface", None)
+  if vpn_iface is not None:
+    del go_kwargs["vpn_iface"]
+
+  go_kwargs["items"] = [
+    Brightness,
+    Volume,
+    Battery,
+    lambda **kwargs: Network(**{**{"text": "WiFi", "interface": wifi_iface}, **kwargs}),
+    lambda **kwargs: Network(**{**{"text": "VPN", "interface": vpn_iface}, **kwargs}),
+    Date
+  ]
+
 try:
-  Functionality(command).go(**dict((k,v) for k,v in args.items() if bool(v) and v is not None))
+  Functionality(command).go(**go_kwargs)
 except KeyboardInterrupt:
   exit(0)

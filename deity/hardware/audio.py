@@ -61,10 +61,11 @@ class Audio(object):
 
   @output.setter
   def output(self, o):
-    name = o
-    if isinstance(name, Output):
-      name = name.name
-    self.pulse.sink_default_set(name)
+    """
+    Set the current output. `o' is an instance with __str__() (like an `Output').
+    """
+    name = o.name if isinstance(o, Output) else str(o)
+    self.pulse.sink_default_set(str(0))
 
   @property
   def inputs(self):
@@ -157,8 +158,7 @@ class Primitive(object):
     v = self.__eq__(other)
     if v == NotImplemented:
       return v
-    else:
-      return not v
+    return not v
 
   def _suspend_func(self):
     return NotImplemented

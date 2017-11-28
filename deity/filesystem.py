@@ -9,11 +9,16 @@ def read_file(path):
 
 def read_sys(klass, iface, *props):
   bp = "/sys/class/" + str(klass) + "/" + str(iface) + "/"
-  for prop in props:
-    v = read_file(bp + prop)
-    if v is not None:
-      return v.rstrip('\n')
+  iterable = map(read_file, map(lambda prop: bp + prop, props))
+  v = next((x for x in iterable if x is not None), None)
+  if v is not None:
+    return v.rstrip('\n')
   return None
+#  for prop in props:
+#    v = read_file(bp + prop)
+#    if v is not None:
+#      return v.rstrip('\n')
+#  return None
 
 def write_sys(klass, iface, prop, value):
   pth = '/'.join(["", "sys", "class", str(klass), str(iface), str(prop)])

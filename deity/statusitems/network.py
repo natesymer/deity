@@ -1,8 +1,8 @@
 from ..statusbar import StatusItem, Color
 
 class Network(StatusItem):
-  def __init__(self, text = "Network", interface = None):
-    super().__init__()
+  def __init__(self, text = "Network", interface = None, **kwargs):
+    super().__init__(**kwargs)
     self.text = text
     if interface is None:
       raise ValueError("Network(): expected interface parameter.")

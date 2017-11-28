@@ -8,21 +8,8 @@ from uuid import uuid4
 from socket import socket, AF_UNIX, SOCK_STREAM
 from threading import Thread
 from deity.hardware.audio import Audio, Input, Output, Stream
-from deity.statusitems.date import Date
-from deity.statusitems.volume import Volume
-from deity.statusitems.network import Network
-from deity.statusitems.brightness import Brightness
-from deity.statusitems.battery import Battery
 from deity.statusbar import StatusBar
 from deity.hardware.brightness import get_brightness, set_brightness
-
-def Functionality(key):
-  return {
-    "audio": AudioFunctionality,
-    "brightness": BrightnessFunctionality,
-    "screenshot": ScreenshotFunctionality,
-    "i3bar": i3barFunctionality
-  }.get(key, i3barFunctionality)()
 
 class AudioFunctionality(object):
   def go(self,
@@ -57,7 +44,7 @@ class AudioFunctionality(object):
       if adjust_volume != None:
         a.output.volume = a.output.volume + int(adjust_volume)
       
-    tickle_i3bar()
+    i3barFunctionality.tickle()
 
 class BrightnessFunctionality(object):
   def go(self,
@@ -78,31 +65,34 @@ class BrightnessFunctionality(object):
         sys.stdout.write("failed to read brightness.\n")
       sys.stdout.flush()
 
-    tickle_i3bar()
+    i3barFunctionality.tickle()
 
 class ScreenshotFunctionality(object):
   def go(self, destination = "~/Pictures/screenshots"):
     os.system("mkdir -p " + destination)
     os.system("swaygrab " + destination.rstrip('/') + strftime("/%-m-%-d-%y_%-H:%M:%S.png"))
 
-sockregex = re.compile(r'deity\.([^.]*)\.([^.]*)\.sock')
-def tickle_i3bar():
-  uname = pwd.getpwuid(os.getuid())[0]
-  for fn in os.listdir('/tmp'):
-    res = sockregex.match(fn)    
-    if res is not None:
-      name, guid = res.groups()
-      if name == uname:
-        try:
-          s = socket(AF_UNIX, SOCK_STREAM)
-          s.connect('/tmp/' + fn)
-          s.send(b'foo')
-        except Exception as e:
-          pass
-        finally:
-          s.close()
-
 class i3barFunctionality(object):
+  sockregex = re.compile(r'deity\.([^.]*)\.([^.]*)\.sock')
+  tickle_msg = b'1'
+
+  @classmethod
+  def tickle(self):
+    uname = pwd.getpwuid(os.getuid())[0]
+    for fn in os.listdir('/tmp'):
+      res = self.sockregex.match(fn)    
+      if res is not None:
+        name, guid = res.groups()
+        if name == uname:
+          try:
+            s = socket(AF_UNIX, SOCK_STREAM)
+            s.connect('/tmp/' + fn)
+            s.send(self.tickle_msg)
+          except Exception as e:
+            pass
+          finally:
+            s.close()
+
   def runipc(self):
     socketfile = "/tmp/deity." + pwd.getpwuid(os.getuid())[0] + "."+ str(uuid4()) + ".sock"
 
@@ -114,39 +104,31 @@ class i3barFunctionality(object):
       while True:
         conn, addr = s.accept()
         try:
-          data = None
-          while True:
-            bs = conn.recv(1024)
-            if not bs:
-              break
-            else:
-              if data is None:
-                data = b'' + bs
-              else:
-                data += bs
-
-          if data is not None:
+          if conn.recv(len(self.__class__.tickle_msg)) is not None:
             self.statusbar.print()
         finally:
           conn.close()
     finally:
-      s.close()
-      if os.path.exists(socketfile):
-        os.remove(socketfile)
+      try:
+        s.close()
+      finally:
+        if os.path.exists(socketfile):
+          os.remove(socketfile)
 
   def go(self, **kwargs):
-    self.statusbar = StatusBar(items = [
-      Brightness(backlight = kwargs.get("backlight", "intel_backlight"),
-                   backlight_class = kwargs.get("backlight_class", "backlight")),
-      Volume(**kwargs),
-      Battery(**kwargs),
-      Network(text = "WiFi", interface = kwargs.get("wifi_iface", "wlp3s0")),
-      Network(text = "VPN", interface = kwargs.get("vpn_iface", "tun0")),
-      Date(**kwargs)
-    ], **kwargs)
+    self.statusbar = StatusBar(**kwargs)
     t = Thread(target=self.runipc)
     t.daemon = True
     t.start()
 
     self.statusbar.run()
 
+func_map = {
+  "audio": AudioFunctionality,
+  "brightness": BrightnessFunctionality,
+  "screenshot": ScreenshotFunctionality,
+  "i3bar": i3barFunctionality
+}
+
+def Functionality(key):
+  return func_map.get(key, i3barFunctionality)()
