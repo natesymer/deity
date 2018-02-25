@@ -1,5 +1,22 @@
 from pulsectl import Pulse, PulseSinkInfo, PulseSourceInfo
 
+class AudioForStatusBar(object):
+  instances = {}
+  def __init__(self, name):
+    self.instance = self.__class__.instances.get(name) or Pulse(name)
+    self.__class__.instances[name] = self.instance
+
+  def get_state(self):
+    sink = self.instance.get_sink_by_name("@DEFAULT_SINK@")
+    muted = bool(sink.mute)
+    volume = int(round(sink.volume.value_flat * 100))
+    return AudioState(volume, muted)
+
+class AudioState(object):
+  def __init__(self, volume, muted):
+    self.volume = volume
+    self.muted = muted
+
 class Audio(object):
   """
   An abstraction over PulseAudio.
@@ -23,8 +40,10 @@ class Audio(object):
     """
     if self.pulse is not None:
       self.pulse.close()
+      del self.__class__.pulses[self.name]
 
   # INTERNAL
+
   def _create_pulse(self):
     """
     Create a PulseAudio client with self.name.
@@ -64,8 +83,7 @@ class Audio(object):
     """
     Set the current output. `o' is an instance with __str__() (like an `Output').
     """
-    name = o.name if isinstance(o, Output) else str(o)
-    self.pulse.sink_default_set(str(0))
+    self.pulse.sink_default_set(str(o))
 
   @property
   def inputs(self):
@@ -89,10 +107,10 @@ class Audio(object):
     self.pulse.source_default_set(i)
 
   def input_streams(self):
-    return list(map(lambda x: Stream(x, self.pulse, "input"), self.pulse.source_output_list()))
+    return list(map(lambda x: InputStream(x, self.pulse), self.pulse.source_output_list()))
 
   def output_streams(self):
-    return list(map(lambda x: Stream(x, self.pulse, "output"), self.pulse.sink_input_list()))
+    return list(map(lambda x: OutputStream(x, self.pulse), self.pulse.sink_input_list()))
 
   def collect_streams(self):
     """
@@ -186,6 +204,30 @@ class Output(Primitive):
   def _suspend_func(self):
     return self.pulse.sink_suspend
 
+class GenericStream(Primitive):
+  def move_to(self, target):
+    raise NotImplemented
+
+class OutputStream(GenericStream):
+  def _mute_func(self):
+    return self.pulse.sink_input_mute
+
+  def _suspend_func(self):
+    return self.pulse.sink_input_suspend
+
+  def move_to(self, target):
+    self.pulse.sink_input_move(self.index, target.index)
+
+class InputStream(GenericStream):
+  def _mute_func(self):
+    return self.pulse.source_output_mute
+
+  def _suspend_func(self):
+    return self.pulse.source_output_suspend
+
+  def move_to(self, target):
+    self.pulse.source_output_move(self.index, target.index)
+
 class Stream(Primitive):
   """
   Represents either a sink input or a source output.
@@ -201,7 +243,7 @@ class Stream(Primitive):
     if self.type == "input":
       return self.pulse.source_output_mute
     elif self.type == "output":
-      return self.pulse.sink_input_list
+      return self.pulse.sink_input_mute
     return NotImplemented
 
   def _suspend_func(self):
