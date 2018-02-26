@@ -49,7 +49,6 @@ class StatusBar(object):
     return chex
 
   def to_dict(self, item):
-    item.refresh()
     return {
       "instance": item.guid,
       "color": self.get_color(item),
@@ -61,11 +60,19 @@ class StatusBar(object):
     return json.dumps(list(map(lambda i: self.to_dict(i), self.items)))
 
   def print(self):
-    s = str(self)
-    if s is not self.prev_string:
-      sys.stdout.write(s + ",\n")
+    should_print = False
+    for i in self.items:
+      i.refresh()
+      if i.has_changed:
+        should_print = True
+
+    sys.stderr.write("Printing? " + str(should_print) + "\n")
+    sys.stderr.flush()
+
+    if should_print:
+      s = str(self)
+      sys.stdout.write(str(self) + ",\n")
       sys.stdout.flush()
-      self.prev_string = s
 
   def run(self):
     sys.stdout.write(self.header() + "[\n")
@@ -74,6 +81,9 @@ class StatusBar(object):
       t = Thread(target=self.read_clicks)
       t.daemon = True # no point in reading clicks for a nonexistant statusbar.
       t.start()
+
+    for i in self.items:
+      i.start_polling()
 
     while True:
       self.print()
@@ -96,6 +106,18 @@ class StatusItem(object):
   def __init__(self, **kwargs):
     super().__init__()
     self.guid = str(uuid4())
+    self.poll = kwargs.get("poll", False)
+    self.has_changed = True
+
+  def start_polling(self):
+    if self.poll:
+      t = Thread(target=self.poll_action)
+      t.daemon = True
+      t.start()
+
+  def poll_action(self):
+    while True:
+      self.refresh()
 
   def __str__(self):
     return self.full_text()

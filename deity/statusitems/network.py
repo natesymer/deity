@@ -1,4 +1,6 @@
+from ..filesystem import read_sys
 from ..statusbar import StatusItem, Color
+import os
 
 class Network(StatusItem):
   def __init__(self, text = "Network", interface = None, **kwargs):
@@ -7,14 +9,17 @@ class Network(StatusItem):
     if interface is None:
       raise ValueError("Network(): expected interface parameter.")
     self.interface = interface
+    self.istuntap = self.interface.startswith("tun", 0, 3) or self.interface.startswith('tap', 0, 3)
+    self.connected = False
 
   def refresh(self):
-    self.connected = False
-    try:
-      with open("/proc/net/if_inet6", 'r') as f:
-        self.connected = self.interface in f.read() # TODO: use faster reading technique
-    except:
-      self.connected = False
+    if self.istuntap:
+      connected = os.path.isdir("/sys/class/net/" + str(self.interface) + "/")
+    else:
+      connected = read_sys("net", self.interface, "operstate") == "up"
+
+    self.has_changed = connected != self.connected
+    self.connected = connected
 
   def full_text(self):
     return self.text

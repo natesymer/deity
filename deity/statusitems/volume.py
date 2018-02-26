@@ -5,14 +5,14 @@ class Volume(StatusItem):
   def __init__(self, **kwargs):
     super().__init__()
     self.audio = AudioForStatusBar("deity i3bar statusitem")
-   # self.audio = Audio("deity i3bar statusitem")
-    self.muted = False
-    self.volume_perc = 100
+    self.muted = True
+    self.volume = -1
 
   def refresh(self):
-    o = self.audio.get_state() #self.audio.output
-    self.muted = o.muted
-    self.volume_perc = o.volume
+    s = self.audio.get_state()
+    self.has_changed = s.muted != self.muted or s.volume != self.volume
+    self.muted = s.muted
+    self.volume = s.volume
 
   def color(self):
     if self.muted:
@@ -20,4 +20,4 @@ class Volume(StatusItem):
     return Color.POSITIVE
 
   def full_text(self):
-    return "VOL " + str(self.volume_perc) + "%"
+    return "VOL " + str(self.volume) + "%"

@@ -1,5 +1,6 @@
 from ..statusbar import StatusItem, Color
 from ..hardware.brightness import get_brightness, set_brightness
+import sys
 
 class Brightness(StatusItem):
   def __init__(self, backlight = "intel_backlight", backlight_class = "backlight", **kwargs):
@@ -9,12 +10,15 @@ class Brightness(StatusItem):
     self.backlight_class = backlight_class
 
   def refresh(self):
-    self.brightness = get_brightness(self.backlight,
-                                     self.backlight_class)    
+    brightness = get_brightness(self.backlight, self.backlight_class)
+    self.has_changed = brightness != self.brightness
+    sys.stderr.write("Brightness changed? " + str(self.has_changed) + "\n")
+    sys.stderr.flush()
+    self.brightness = brightness
 
   def full_text(self):
     if self.brightness is None:
-      return "BRIGHT"
+      return "BRIGHT ERROR"
     return "BRIGHT " + str(self.brightness) + "%"
 
   def color(self):
