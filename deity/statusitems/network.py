@@ -12,14 +12,15 @@ class Network(StatusItem):
     self.istuntap = self.interface.startswith("tun", 0, 3) or self.interface.startswith('tap', 0, 3)
     self.connected = False
 
-  def refresh(self):
+  def refresh(self, periodic):
     if self.istuntap:
       connected = os.path.isdir("/sys/class/net/" + str(self.interface) + "/")
     else:
       connected = read_sys("net", self.interface, "operstate") == "up"
 
-    self.has_changed = connected != self.connected
+    has_changed = connected != self.connected
     self.connected = connected
+    return has_changed
 
   def full_text(self):
     return self.text

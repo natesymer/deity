@@ -105,7 +105,7 @@ class i3barFunctionality(object):
         conn, addr = s.accept()
         try:
           if conn.recv(len(self.__class__.tickle_msg)) is not None:
-            self.statusbar.print()
+            self.statusbar.print(periodic=False)
         finally:
           conn.close()
     finally:

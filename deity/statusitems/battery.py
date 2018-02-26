@@ -10,7 +10,7 @@ class Battery(StatusItem):
     self.percent = -1
     self.is_charging = None
 
-  def refresh(self):
+  def refresh(self, periodic):
     capacity = int(self.read("capacity") or -1)
 
     # There is no reason to update the charging status is battery is not low.
@@ -19,9 +19,10 @@ class Battery(StatusItem):
     else:
       is_charging = None
 
-    self.has_changed = capacity != self.percent or is_charging != self.is_charging
+    has_changed = capacity != self.percent or is_charging != self.is_charging
     self.percent = capacity
     self.is_charging = is_charging
+    return has_changed
 
   def read(self, fname):
     return read_sys("power_supply", self.power_supply, fname)

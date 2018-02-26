@@ -4,6 +4,7 @@ from enum import Enum
 from uuid import uuid4
 from threading import Thread
 from time import sleep
+from functools import reduce
 
 class Color(Enum):
   POSITIVE = 1
@@ -59,17 +60,8 @@ class StatusBar(object):
   def __str__(self):
     return json.dumps(list(map(lambda i: self.to_dict(i), self.items)))
 
-  def print(self):
-    should_print = False
-    for i in self.items:
-      i.refresh()
-      if i.has_changed:
-        should_print = True
-
-    sys.stderr.write("Printing? " + str(should_print) + "\n")
-    sys.stderr.flush()
-
-    if should_print:
+  def print(self, periodic=True):
+    if reduce(lambda acc, i: i.refresh(periodic) or acc, self.items, False):
       s = str(self)
       sys.stdout.write(str(self) + ",\n")
       sys.stdout.flush()
@@ -85,9 +77,10 @@ class StatusBar(object):
     for i in self.items:
       i.start_polling()
 
+    self.print(False)
     while True:
-      self.print()
       sleep(self.refresh_interval)
+      self.print()
 
   def read_clicks(self):
     while True:
@@ -107,7 +100,6 @@ class StatusItem(object):
     super().__init__()
     self.guid = str(uuid4())
     self.poll = kwargs.get("poll", False)
-    self.has_changed = True
 
   def start_polling(self):
     if self.poll:
@@ -134,7 +126,7 @@ class StatusItem(object):
   def on_click(self):
     print("CLICKED!")
 
-  def refresh(self):
+  def refresh(self, periodic):
     """
     Refresh the state of the item
     """

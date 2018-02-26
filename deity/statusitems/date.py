@@ -9,10 +9,11 @@ class Date(StatusItem):
     self.format = date_format
     self.date_string = ""
 
-  def refresh(self):
+  def refresh(self, periodic):
     ds = time.strftime(self.format)
-    self.has_changed = ds != self.date_string
+    has_changed = ds != self.date_string
     self.date_string = ds
+    return has_changed
 
   def full_text(self):
     return self.date_string

@@ -8,11 +8,14 @@ class Volume(StatusItem):
     self.muted = True
     self.volume = -1
 
-  def refresh(self):
-    s = self.audio.get_state()
-    self.has_changed = s.muted != self.muted or s.volume != self.volume
-    self.muted = s.muted
-    self.volume = s.volume
+  def refresh(self, periodic):
+    if not periodic:
+      s = self.audio.get_state()
+      has_changed = s.muted != self.muted or s.volume != self.volume
+      self.muted = s.muted
+      self.volume = s.volume
+      return has_changed
+    return False
 
   def color(self):
     if self.muted:
