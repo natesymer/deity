@@ -6,6 +6,8 @@ from deity.statusitems.volume import Volume
 from deity.statusitems.network import Network
 from deity.statusitems.brightness import Brightness
 from deity.statusitems.battery import Battery
+from deity.statusitems.cpu import CPU
+from deity.statusitems.memory import Memory
 from argparse import ArgumentParser
 
 main_parser = ArgumentParser(description="Control a Linux desktop without a DE.")
@@ -73,12 +75,14 @@ if command == "i3bar":
     del go_kwargs["time_format"]
 
   go_kwargs["items"] = [
+    Memory,
+    CPU,
     Brightness,
     Volume,
     Battery,
-    lambda **kwargs: Network(**{**{"text": "ETH", "interface": eth_iface}, **kwargs}),
+    lambda **kwargs: Network(**{**{"text": "\uf0e8", "interface": eth_iface}, **kwargs}),
     lambda **kwargs: Network(**{**{"text": "\uf1eb", "interface": wifi_iface}, **kwargs}),
-    lambda **kwargs: Network(**{**{"text": "VPN", "interface": vpn_iface}, **kwargs}),
+    lambda **kwargs: Network(**{**{"text": "\uf21b", "interface": vpn_iface}, **kwargs}),
     lambda **kwargs: Date(**{**{"date_format": date_format}, **kwargs}),
     lambda **kwargs: Date(**{**{"date_format": time_format}, **kwargs})
   ]
