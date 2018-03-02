@@ -28,7 +28,8 @@ brightness_parser.add_argument("--adjust", metavar="INTEGER", help="Adjust the b
 brightness_parser.add_argument("--set", metavar="INTEGER", help="Set the brightness to INTEGER", type=int)
 
 i3bar_parser = subparsers.add_parser("i3bar", help="i3bar-compliant status bar daemon")
-i3bar_parser.add_argument("--date-format", metavar="FORMAT", help="Display a strftime in the statusbar using FORMAT")
+i3bar_parser.add_argument("--date-format", metavar="FORMAT", help="Display a strftime date in the statusbar using FORMAT")
+i3bar_parser.add_argument("--time-format", metavar="FORMAT", help="Display a strftime time in the statusbar using FORMAT")
 i3bar_parser.add_argument("--refresh-interval", metavar="FLOAT", help="Set the refresh interval", type=float)
 i3bar_parser.add_argument("--color-positive", metavar="HEXCOLOR", help="Default text color")
 i3bar_parser.add_argument("--color-negative", metavar="HEXCOLOR", help="Text color used to indicate a negative condition")
@@ -63,14 +64,23 @@ if command == "i3bar":
   if vpn_iface is not None:
     del go_kwargs["vpn_iface"]
 
+  date_format = go_kwargs.get("date_format", None)
+  if date_format is not None:
+    del go_kwargs["date_format"]
+
+  time_format = go_kwargs.get("time_format", None)
+  if time_format is not None:
+    del go_kwargs["time_format"]
+
   go_kwargs["items"] = [
     Brightness,
     Volume,
     Battery,
     lambda **kwargs: Network(**{**{"text": "ETH", "interface": eth_iface}, **kwargs}),
-    lambda **kwargs: Network(**{**{"text": "WiFi", "interface": wifi_iface}, **kwargs}),
+    lambda **kwargs: Network(**{**{"text": "\uf1eb", "interface": wifi_iface}, **kwargs}),
     lambda **kwargs: Network(**{**{"text": "VPN", "interface": vpn_iface}, **kwargs}),
-    Date
+    lambda **kwargs: Date(**{**{"date_format": date_format}, **kwargs}),
+    lambda **kwargs: Date(**{**{"date_format": time_format}, **kwargs})
   ]
 
 try:

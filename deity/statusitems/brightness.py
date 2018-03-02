@@ -17,8 +17,8 @@ class Brightness(StatusItem):
 
   def full_text(self):
     if self.brightness is None:
-      return "BRIGHT ERROR"
-    return "BRIGHT " + str(self.brightness) + "%"
+      return "\uf185 ERROR"
+    return "\uf185 " + str(self.brightness) + "%"
 
   def color(self):
     if self.brightness is None:

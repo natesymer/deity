@@ -23,4 +23,4 @@ class Volume(StatusItem):
     return Color.POSITIVE
 
   def full_text(self):
-    return "VOL " + str(self.volume) + "%"
+    return "\uf028 " + str(self.volume) + "%"

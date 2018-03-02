@@ -28,7 +28,7 @@ class Battery(StatusItem):
     return read_sys("power_supply", self.power_supply, fname)
 
   def full_text(self):
-    return "BAT " + str(self.percent) + "%"
+    return "\uf240 " + str(self.percent) + "%"
 
   def color(self):
     if self.percent <= self.LOW_BAT_THRESHOLD and not self.is_charging:
