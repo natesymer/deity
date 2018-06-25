@@ -53,40 +53,6 @@ else:
 
 go_kwargs = dict((k,v) for k,v in args.items() if bool(v) and v is not None)
 
-if command == "i3bar":
-  eth_iface = go_kwargs.get("eth_iface", None)
-  if eth_iface is not None:
-    del go_kwargs["eth_iface"];
-
-  wifi_iface = go_kwargs.get("wifi_iface", None)
-  if wifi_iface is not None:
-    del go_kwargs["wifi_iface"]
-
-  vpn_iface = go_kwargs.get("vpn_iface", None)
-  if vpn_iface is not None:
-    del go_kwargs["vpn_iface"]
-
-  date_format = go_kwargs.get("date_format", None)
-  if date_format is not None:
-    del go_kwargs["date_format"]
-
-  time_format = go_kwargs.get("time_format", None)
-  if time_format is not None:
-    del go_kwargs["time_format"]
-
-  go_kwargs["items"] = [
-    Memory,
-    CPU,
-    Brightness,
-    Volume,
-    Battery,
-    lambda **kwargs: Network(**{**{"text": "\uf0e8", "interface": eth_iface}, **kwargs}),
-    lambda **kwargs: Network(**{**{"text": "\uf1eb", "interface": wifi_iface}, **kwargs}),
-    lambda **kwargs: Network(**{**{"text": "\uf21b", "interface": vpn_iface}, **kwargs}),
-    lambda **kwargs: Date(**{**{"date_format": date_format}, **kwargs}),
-    lambda **kwargs: Date(**{**{"date_format": time_format}, **kwargs})
-  ]
-
 try:
   Functionality(command).go(**go_kwargs)
 except KeyboardInterrupt:

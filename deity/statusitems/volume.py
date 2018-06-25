@@ -1,19 +1,22 @@
 from ..statusbar import StatusItem, Color
-from ..hardware.audio import Audio, AudioForStatusBar
+
+from pulsectl import Pulse
 
 class Volume(StatusItem):
   def __init__(self, **kwargs):
     super().__init__()
-    self.audio = AudioForStatusBar("deity i3bar statusitem")
+    self.pulse = Pulse("deity i3bar statusitem")
     self.muted = True
     self.volume = -1
 
   def refresh(self, periodic):
     if not periodic:
-      s = self.audio.get_state()
-      has_changed = s.muted != self.muted or s.volume != self.volume
-      self.muted = s.muted
-      self.volume = s.volume
+      sink = self.pulse.get_sink_by_name("@DEFAULT_SINK@")
+      muted = bool(sink.mute)
+      volume = int(round(sink.volume.value_flat * 100))
+      has_changed = muted != self.muted or volume != self.volume
+      self.muted = muted
+      self.volume = volume
       return has_changed
     return False
 

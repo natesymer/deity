@@ -68,6 +68,7 @@ class StatusBar(object):
 
   def run(self):
     sys.stdout.write(self.header() + "[\n")
+    sys.stdout.flush()
 
     if self.clicks_enabled:
       t = Thread(target=self.read_clicks)

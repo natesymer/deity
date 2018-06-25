@@ -11,39 +11,70 @@ from deity.hardware.audio import Audio, Input, Output, Stream
 from deity.statusbar import StatusBar
 from deity.hardware.brightness import get_brightness, set_brightness
 
+from pulsectl import Pulse
+
+__pulse = None
+def pulse():
+  global __pulse
+  if __pulse is None:
+    __pulse = Pulse("deity")
+  return __pulse
+
+__sink = None
+def default_sink():
+  global __sink
+  if __sink is None:
+    __sink = pulse().get_sink_by_name("@DEFAULT_SINK@")
+  return __sink
+
+__source = None
+def default_source():
+  global __source
+  if __source is None:
+    __source = pulse().get_source_by_name("@DEFAULT_SOURCE@")
+  return __source
+
 class AudioFunctionality(object):
   def go(self,
          list_outputs = False, toggle_mute = False,
          output = None, input = None,
          adjust_volume = None):
-    with Audio("deity") as a:
+    if output != None:
+      pulse().sink_default_set(output)
+      __sink = None
+
+    if input != None:
+      pulse().source_default_set(input)
+      __source = None
+
+    if toggle_mute:
+      pulse().sink_mute(default_sink().index, int(not bool(default_sink().mute)))
+
+    if adjust_volume != None:
+      new_vol = int(round(default_sink().volume.value_flat * 100)) + int(adjust_volume)
+      new_vol_perc = float(min(100, max(0, new_vol))) / 100.0
+      pulse().volume_set_all_chans(default_sink(), new_vol_perc)
+
+    # Move all sink inputs to the default sink
+    for si in pulse.sink_input_list():
+      pulse().sink_input_move(si.index, default_sink().index)
+
+    # Move all source outputs to the default source.
+    for so in self.pulse.source_output_list():
+      pulse().source_output_move(so.index, default_source().index)
+
+    # Ensure the default sink is the only non-suspended sink
+    for sink in pulse().sink_list():
       if list_outputs:
-        for o in a.outputs:
-          print(str(o))
+        print(sink.name)
+      pulse().sink_suspend(sink.index, int(sink.name != default_sink().name))
+    
+    # Ensure the default source is the only non-suspended source
+    for source in pulse().source_list():
+      pulse().source_suspend(source.index, int(sink.name != default_sink().name))
 
-      if toggle_mute:
-        a.output.muted = not a.output.muted
+    pulse().close()
 
-      if output != None:
-        a.output = output
-        a.output.enable()
-        a.collect_streams()
-        for o in a.outputs:
-          if o.name != output:
-            o.suspend()
-
-      if input != None:
-        i = a.named_input(input)
-        if i is not None:
-          a.input = i
-          a.collect_streams()
-          for i in a.inputs:
-            if i != a.input:
-              i.suspend()
-
-      if adjust_volume != None:
-        a.output.volume = a.output.volume + int(adjust_volume)
-      
     i3barFunctionality.tickle()
 
 class BrightnessFunctionality(object):
@@ -115,7 +146,40 @@ class i3barFunctionality(object):
         if os.path.exists(socketfile):
           os.remove(socketfile)
 
-  def go(self, **kwargs):
+  def go(self, **kwargs)
+    eth_iface = kwargs.get("eth_iface", None)
+    if eth_iface is not None:
+      del kwargs["eth_iface"];
+    
+    wifi_iface = kwargs.get("wifi_iface", None)
+    if wifi_iface is not None:
+      del kwargs["wifi_iface"]
+    
+    vpn_iface = kwargs.get("vpn_iface", None)
+    if vpn_iface is not None:
+      del kwargs["vpn_iface"]
+    
+    date_format = kwargs.get("date_format", None)
+    if date_format is not None:
+      del kwargs["date_format"]
+    
+    time_format = kwargs.get("time_format", None)
+    if time_format is not None:
+      del kwargs["time_format"]
+    
+    kwargs["items"] = [
+      Memory,
+      CPU,
+      Brightness,
+      Volume,
+      Battery,
+      lambda **kwargs: Network(**{**{"text": "\uf0e8", "interface": eth_iface}, **kwargs}),
+      lambda **kwargs: Network(**{**{"text": "\uf1eb", "interface": wifi_iface}, **kwargs}),
+      lambda **kwargs: Network(**{**{"text": "\uf21b", "interface": vpn_iface}, **kwargs}),
+      lambda **kwargs: Date(**{**{"date_format": date_format}, **kwargs}),
+      lambda **kwargs: Date(**{**{"date_format": time_format}, **kwargs})
+    ]
+
     self.statusbar = StatusBar(**kwargs)
     t = Thread(target=self.runipc)
     t.daemon = True
