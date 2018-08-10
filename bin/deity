@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 
 from deity.functionality import Functionality
 from deity.statusitems.date import Date
@@ -17,11 +17,13 @@ screenshot_parser = subparsers.add_parser("screenshot", help="take a screenshot"
 screenshot_parser.add_argument("--destination", help="Where to save the screenshot", default=None, type=str)
 
 audio_parser = subparsers.add_parser("audio", help="control audio")
+audio_parser.add_argument("--use-source", help="Modify the volume of the microphone rather than the speaker.", action='store_true')
 audio_parser.add_argument("--adjust-volume", metavar="INTEGER", help="Adjust audo volume", type=int)
 audio_parser.add_argument("--toggle-mute", help="Toggle audo mute", action="store_true")
 audio_parser.add_argument("--output", metavar="NAME", help="Set the active audio sink", type=str)
 audio_parser.add_argument("--input", metavar="INTEGER", help="Set the active audio source", type=str)
 audio_parser.add_argument("--list-outputs", help="Print a listing of sinks", action='store_true')
+audio_parser.add_argument("--list-inputs", help="Print a listing of sources", action='store_true')
 
 brightness_parser = subparsers.add_parser("brightness", help="control brightness")
 brightness_parser.add_argument("--backlight", metavar="NAME", help="The name of your backlight in /sys/class/<SYSCLASS>")

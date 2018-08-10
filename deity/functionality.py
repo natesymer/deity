@@ -7,9 +7,16 @@ import re
 from uuid import uuid4
 from socket import socket, AF_UNIX, SOCK_STREAM
 from threading import Thread
-from deity.hardware.audio import Audio, Input, Output, Stream
-from deity.statusbar import StatusBar
-from deity.hardware.brightness import get_brightness, set_brightness
+#from deity.hardware.audio import Audio, Input, Output, Stream
+from .statusbar import StatusBar
+from .hardware.brightness import get_brightness, set_brightness
+from .statusitems.memory import Memory
+from .statusitems.cpu import CPU
+from .statusitems.brightness import Brightness
+from .statusitems.volume import Volume
+from .statusitems.battery import Battery
+from .statusitems.network import Network
+from .statusitems.date import Date
 
 from pulsectl import Pulse
 
@@ -54,14 +61,19 @@ class AudioFunctionality(object):
       new_vol = int(round(default_sink().volume.value_flat * 100)) + int(adjust_volume)
       new_vol_perc = float(min(100, max(0, new_vol))) / 100.0
       pulse().volume_set_all_chans(default_sink(), new_vol_perc)
+      pulse().volume_set_all_chans(default_source(), new_vol_perc)
 
     # Move all sink inputs to the default sink
-    for si in pulse.sink_input_list():
+    for si in pulse().sink_input_list():
       pulse().sink_input_move(si.index, default_sink().index)
 
     # Move all source outputs to the default source.
-    for so in self.pulse.source_output_list():
-      pulse().source_output_move(so.index, default_source().index)
+    for so in pulse().source_output_list():
+      try:
+        pulse().source_output_move(so.index, default_source().index)
+      except:
+        print("FAILED TO MOVE SOURCE")
+        continue
 
     # Ensure the default sink is the only non-suspended sink
     for sink in pulse().sink_list():
@@ -71,7 +83,11 @@ class AudioFunctionality(object):
     
     # Ensure the default source is the only non-suspended source
     for source in pulse().source_list():
-      pulse().source_suspend(source.index, int(sink.name != default_sink().name))
+      print(source.name)
+      try:
+        pulse().source_suspend(source.index, int(source.index != default_source().index))
+      except:
+        continue
 
     pulse().close()
 
@@ -146,7 +162,7 @@ class i3barFunctionality(object):
         if os.path.exists(socketfile):
           os.remove(socketfile)
 
-  def go(self, **kwargs)
+  def go(self, **kwargs):
     eth_iface = kwargs.get("eth_iface", None)
     if eth_iface is not None:
       del kwargs["eth_iface"];

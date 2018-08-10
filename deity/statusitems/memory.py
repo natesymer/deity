@@ -19,7 +19,7 @@ class Memory(StatusItem):
       divisor = 1024 * 1024 * 1024
     else:
       divisor = 1
-    return round(int(num) * divisor)
+    return round(int(num) * divisor * (1000 / 1024))
 
   def refresh(self, periodic):
     with open('/proc/meminfo') as mi:
