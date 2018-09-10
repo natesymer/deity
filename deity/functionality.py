@@ -117,7 +117,7 @@ class BrightnessFunctionality(object):
 class ScreenshotFunctionality(object):
   def go(self, destination = "~/Pictures/screenshots"):
     os.system("mkdir -p " + destination)
-    os.system("swaygrab " + destination.rstrip('/') + strftime("/%-m-%-d-%y_%-H:%M:%S.png"))
+    os.system("grim " + destination.rstrip('/') + strftime("/%-m-%-d-%y_%-H:%M:%S.png"))
 
 class i3barFunctionality(object):
   sockregex = re.compile(r'deity\.([^.]*)\.([^.]*)\.sock')
