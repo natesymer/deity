@@ -16,7 +16,7 @@ def eprint(*args, **kwargs):
 
 class StatusBar(object):
   def __init__(self,
-               clicks_enabled = False,
+               clicks_enabled = True,
                refresh_interval = 3.0,
                positive_color = "#FFFFFF",
                neutral_color = "#AAAAAA",
@@ -51,6 +51,7 @@ class StatusBar(object):
 
   def to_dict(self, item):
     return {
+      "name": "name_" + item.guid, # required for clicks
       "instance": item.guid,
       "color": self.get_color(item),
       "full_text": str(item),
@@ -86,16 +87,15 @@ class StatusBar(object):
   def read_clicks(self):
     while True:
       for s in sys.stdin:
+        s = s.strip(",\n")
         if s is not None and len(s) > 0:
-          if s.strip() is not "[":
-            v = json.loads(s)
-            button = int(v["button"])
-            if button == 1:
-              instance = str(v["instance"])
-              for i in self.items:
-                if i.guid == instance:
-                  i.on_click()
-    
+          if s != "[":
+            click = json.loads(s)
+            instance = str(click["instance"])
+            for i in self.items:
+              if i.guid == instance:
+                i.on_click(int(click["button"]))
+ 
 class StatusItem(object):
   def __init__(self, **kwargs):
     super().__init__()
@@ -124,8 +124,8 @@ class StatusItem(object):
   def color(self):
     return Color.POSITIVE
 
-  def on_click(self):
-    print("CLICKED!")
+  def on_click(self, button_number):
+    pass
 
   def refresh(self, periodic):
     """

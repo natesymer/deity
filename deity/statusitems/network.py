@@ -30,3 +30,14 @@ class Network(StatusItem):
       return Color.POSITIVE
     else:
       return Color.NEGATIVE
+
+  def on_click(self, button_number):
+#      if button_number == 1 and self.interface == 'wlan0':
+#          if not self.connected:
+#              os.system('iwctl station {} scan'.format(self.interface))
+#          else:
+#              os.system('iwctl station {} disconnect'.format(self.interface))
+#              self.connected = False
+    pass          
+
+  

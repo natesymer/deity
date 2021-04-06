@@ -32,18 +32,18 @@ brightness_parser.add_argument("--adjust", metavar="INTEGER", help="Adjust the b
 brightness_parser.add_argument("--set", metavar="INTEGER", help="Set the brightness to INTEGER", type=int)
 
 i3bar_parser = subparsers.add_parser("i3bar", help="i3bar-compliant status bar daemon")
-i3bar_parser.add_argument("--date-format", metavar="FORMAT", help="Display a strftime date in the statusbar using FORMAT")
-i3bar_parser.add_argument("--time-format", metavar="FORMAT", help="Display a strftime time in the statusbar using FORMAT")
-i3bar_parser.add_argument("--refresh-interval", metavar="FLOAT", help="Set the refresh interval", type=float)
+i3bar_parser.add_argument("--date-format", metavar="FORMAT", help="Display a strftime date in the statusbar using FORMAT", default="%-m.%-d.%y")
+i3bar_parser.add_argument("--time-format", metavar="FORMAT", help="Display a strftime time in the statusbar using FORMAT", default="%-I:%M %p")
+i3bar_parser.add_argument("--refresh-interval", metavar="FLOAT", help="Set the refresh interval", type=float, default=2.0)
 i3bar_parser.add_argument("--color-positive", metavar="HEXCOLOR", help="Default text color")
 i3bar_parser.add_argument("--color-negative", metavar="HEXCOLOR", help="Text color used to indicate a negative condition")
 i3bar_parser.add_argument("--color-neutral", metavar="HEXCOLOR", help="Text color used to indicate a neutral condition")
 i3bar_parser.add_argument("--power-supply", metavar="POWER_SUPPLY", help="Power supply for which to report percentage")
-i3bar_parser.add_argument("--wifi-iface", metavar="INTERFACE", help="Wi-Fi interface for which to report status")
-i3bar_parser.add_argument("--vpn-iface", metavar="INTERFACE", help="VPN/tunnel interface for which to report status")
-i3bar_parser.add_argument("--eth-iface", metavar="INTERFACE", help="Ethernet interface for which to report status")
-i3bar_parser.add_argument("--backlight", metavar="NAME", help="/sys/class/<CLASS>/<NAME>")
-i3bar_parser.add_argument("--backlight-class", metavar="CLASS", help="/sys/class/<CLASS>/<NAME>")
+i3bar_parser.add_argument("--wifi-iface", metavar="INTERFACE", help="Wi-Fi interface for which to report status", default="wlan0")
+i3bar_parser.add_argument("--vpn-iface", metavar="INTERFACE", help="VPN/tunnel interface for which to report status", default="tun0")
+i3bar_parser.add_argument("--eth-iface", metavar="INTERFACE", help="Ethernet interface for which to report status", default="ens9")
+i3bar_parser.add_argument("--backlight", metavar="NAME", help="/sys/class/<CLASS>/<NAME>", default="intel_backlight")
+i3bar_parser.add_argument("--backlight-class", metavar="CLASS", help="/sys/class/<CLASS>/<NAME>", default="backlight")
 
 args = main_parser.parse_args().__dict__
 
