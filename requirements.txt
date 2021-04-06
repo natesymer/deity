@@ -4,7 +4,7 @@ Glances==2.11.1
 louis==3.3.0
 packaging==16.8
 pbr==3.1.1
-psutil==5.3.1
+psutil==5.6.6
 pulsectl==17.9.3
 pyparsing==2.2.0
 pyxdg==0.25
