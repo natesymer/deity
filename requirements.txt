@@ -1,6 +1,6 @@
 appdirs==1.4.3
 -e git+git@github.com:natesymer/deity@cc9799c91d00391201cda0b698df007dc1ee7fa3#egg=deity
-Glances==2.11.1
+Glances==3.2.1
 louis==3.3.0
 packaging==16.8
 pbr==3.1.1
